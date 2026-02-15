@@ -16,6 +16,7 @@ from app.routers import (
     indicators,
     jobs,
     market,
+    paper_trading,
     platform,
     portfolio,
     risk,
@@ -41,6 +42,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         )
 
     yield
+
+    # Cleanup: stop paper trading if running
+    from app.deps import _paper_trading_service
+
+    if _paper_trading_service is not None and _paper_trading_service.is_running:
+        _paper_trading_service.stop()
 
     await engine.dispose()
 
@@ -71,6 +78,7 @@ app.include_router(screening.router, prefix="/api")
 app.include_router(risk.router, prefix="/api")
 app.include_router(backtest.router, prefix="/api")
 app.include_router(indicators.router, prefix="/api")
+app.include_router(paper_trading.router, prefix="/api")
 app.include_router(platform.router, prefix="/api")
 
 

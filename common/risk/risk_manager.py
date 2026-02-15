@@ -2,16 +2,19 @@
 Crypto-Investor Risk Management Module
 =======================================
 Shared risk controls that wrap all framework tiers.
-Enforces position sizing, drawdown limits, correlation checks, and daily loss limits.
+Enforces position sizing, drawdown limits, correlation checks,
+VaR/CVaR estimation, and daily loss limits.
 """
 
 import logging
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional
 
 import numpy as np
 import pandas as pd
+from scipy import stats as scipy_stats
 
 logger = logging.getLogger("risk_manager")
 
@@ -43,12 +46,160 @@ class PortfolioState:
     last_update: Optional[datetime] = None
 
 
+@dataclass
+class VaRResult:
+    """Value-at-Risk calculation result."""
+    var_95: float = 0.0          # 95% VaR (dollar amount)
+    var_99: float = 0.0          # 99% VaR (dollar amount)
+    cvar_95: float = 0.0         # 95% Conditional VaR (Expected Shortfall)
+    cvar_99: float = 0.0         # 99% Conditional VaR
+    method: str = "parametric"   # parametric or historical
+    window_days: int = 0         # number of return observations used
+
+
+class ReturnTracker:
+    """
+    Tracks per-symbol return series for correlation and VaR calculations.
+
+    Stores a rolling window of daily returns for each symbol that has been
+    traded, enabling portfolio-level risk metrics.
+    """
+
+    def __init__(self, max_history: int = 252):
+        self.max_history = max_history
+        self._returns: dict[str, deque[float]] = {}
+        self._prices: dict[str, deque[float]] = {}
+
+    def record_price(self, symbol: str, price: float) -> None:
+        """Record a price observation for a symbol."""
+        if symbol not in self._prices:
+            self._prices[symbol] = deque(maxlen=self.max_history + 1)
+            self._returns[symbol] = deque(maxlen=self.max_history)
+
+        prices = self._prices[symbol]
+        prices.append(price)
+
+        if len(prices) >= 2:
+            ret = (prices[-1] - prices[-2]) / prices[-2]
+            self._returns[symbol].append(ret)
+
+    def get_returns(self, symbol: str) -> np.ndarray:
+        """Get return series for a symbol."""
+        if symbol not in self._returns:
+            return np.array([])
+        return np.array(self._returns[symbol])
+
+    def get_correlation_matrix(self, symbols: Optional[list[str]] = None) -> pd.DataFrame:
+        """
+        Compute correlation matrix across tracked symbols.
+
+        Only includes symbols with >= 20 return observations for statistical relevance.
+        """
+        if symbols is None:
+            symbols = [s for s, r in self._returns.items() if len(r) >= 20]
+        else:
+            symbols = [s for s in symbols if s in self._returns and len(self._returns[s]) >= 20]
+
+        if len(symbols) < 2:
+            return pd.DataFrame()
+
+        # Align return series by using the minimum shared length
+        min_len = min(len(self._returns[s]) for s in symbols)
+        data = {s: list(self._returns[s])[-min_len:] for s in symbols}
+        df = pd.DataFrame(data)
+        return df.corr()
+
+    def compute_var(
+        self,
+        symbols_weights: dict[str, float],
+        portfolio_value: float,
+        method: str = "parametric",
+    ) -> VaRResult:
+        """
+        Compute portfolio VaR and CVaR.
+
+        Parameters
+        ----------
+        symbols_weights : dict
+            {symbol: weight} where weight = position_value / portfolio_value
+        portfolio_value : float
+            Total portfolio value in base currency
+        method : str
+            'parametric' (Gaussian) or 'historical'
+
+        Returns
+        -------
+        VaRResult with VaR and CVaR at 95% and 99% confidence
+        """
+        valid_symbols = [
+            s for s in symbols_weights
+            if s in self._returns and len(self._returns[s]) >= 20
+        ]
+
+        if not valid_symbols:
+            return VaRResult(method=method)
+
+        # Build aligned return matrix
+        min_len = min(len(self._returns[s]) for s in valid_symbols)
+        returns_data = {s: list(self._returns[s])[-min_len:] for s in valid_symbols}
+        returns_df = pd.DataFrame(returns_data)
+        weights = np.array([symbols_weights.get(s, 0.0) for s in valid_symbols])
+
+        # Portfolio returns
+        portfolio_returns = returns_df.values @ weights
+
+        if method == "historical":
+            sorted_returns = np.sort(portfolio_returns)
+            n = len(sorted_returns)
+            idx_95 = max(0, int(n * 0.05))
+            idx_99 = max(0, int(n * 0.01))
+
+            var_95 = -sorted_returns[idx_95] * portfolio_value
+            var_99 = -sorted_returns[idx_99] * portfolio_value
+            cvar_95 = -sorted_returns[:idx_95 + 1].mean() * portfolio_value if idx_95 > 0 else var_95
+            cvar_99 = -sorted_returns[:idx_99 + 1].mean() * portfolio_value if idx_99 > 0 else var_99
+        else:
+            # Parametric (Gaussian) VaR
+            mu = portfolio_returns.mean()
+            sigma = portfolio_returns.std()
+            if sigma == 0:
+                return VaRResult(method=method, window_days=min_len)
+
+            var_95 = -(mu + scipy_stats.norm.ppf(0.05) * sigma) * portfolio_value
+            var_99 = -(mu + scipy_stats.norm.ppf(0.01) * sigma) * portfolio_value
+
+            # CVaR = E[loss | loss > VaR] for Gaussian
+            cvar_95 = (
+                -(mu - sigma * scipy_stats.norm.pdf(scipy_stats.norm.ppf(0.05)) / 0.05)
+                * portfolio_value
+            )
+            cvar_99 = (
+                -(mu - sigma * scipy_stats.norm.pdf(scipy_stats.norm.ppf(0.01)) / 0.01)
+                * portfolio_value
+            )
+
+        return VaRResult(
+            var_95=round(var_95, 2),
+            var_99=round(var_99, 2),
+            cvar_95=round(cvar_95, 2),
+            cvar_99=round(cvar_99, 2),
+            method=method,
+            window_days=min_len,
+        )
+
+    @property
+    def tracked_symbols(self) -> list[str]:
+        """Symbols with return data."""
+        return list(self._returns.keys())
+
+
 class RiskManager:
     """
     Centralized risk manager that gates all trade decisions.
 
     Usage:
         rm = RiskManager(limits=RiskLimits(max_portfolio_drawdown=0.10))
+        rm.return_tracker.record_price("BTC/USDT", 50000)  # feed prices
         approved, reason = rm.check_new_trade(symbol, side, size, entry, stop_loss)
         if approved:
             execute_trade(...)
@@ -59,6 +210,7 @@ class RiskManager:
     def __init__(self, limits: Optional[RiskLimits] = None):
         self.limits = limits or RiskLimits()
         self.state = PortfolioState()
+        self.return_tracker = ReturnTracker()
         logger.info(f"RiskManager initialized: {self.limits}")
 
     def update_equity(self, current_equity: float):
@@ -171,9 +323,42 @@ class RiskManager:
             if trade_risk > self.limits.max_single_trade_risk * 2:
                 return False, f"Stop loss too wide: {trade_risk:.2%} risk per unit"
 
+        # Check correlation with existing positions
+        corr_ok, corr_reason = self._check_correlation(symbol)
+        if not corr_ok:
+            return False, corr_reason
+
         # All checks passed
         logger.info(f"Trade approved: {side} {size:.6f} {symbol} @ {entry_price}")
         return True, "approved"
+
+    def _check_correlation(self, symbol: str) -> tuple[bool, str]:
+        """Check if new symbol is too correlated with existing positions."""
+        if not self.state.open_positions:
+            return True, ""
+
+        existing_symbols = list(self.state.open_positions.keys())
+        all_symbols = existing_symbols + [symbol]
+
+        corr_matrix = self.return_tracker.get_correlation_matrix(all_symbols)
+        if corr_matrix.empty:
+            # Not enough data to check — allow the trade but warn
+            logger.info(f"Insufficient return history for correlation check on {symbol}")
+            return True, ""
+
+        if symbol not in corr_matrix.columns:
+            return True, ""
+
+        for existing in existing_symbols:
+            if existing in corr_matrix.columns:
+                corr = abs(corr_matrix.loc[symbol, existing])
+                if corr > self.limits.max_correlation:
+                    return False, (
+                        f"Correlation too high: {symbol} vs {existing} = {corr:.2f} "
+                        f"> {self.limits.max_correlation}"
+                    )
+
+        return True, ""
 
     def register_trade(self, symbol: str, side: str, size: float, entry_price: float):
         """Register an executed trade for tracking."""
@@ -214,4 +399,81 @@ class RiskManager:
             "open_positions": len(self.state.open_positions),
             "is_halted": self.state.is_halted,
             "halt_reason": self.state.halt_reason,
+        }
+
+    def get_var(self, method: str = "parametric") -> VaRResult:
+        """
+        Compute portfolio VaR/CVaR based on current open positions.
+
+        Requires return data to have been fed via return_tracker.record_price().
+        """
+        if not self.state.open_positions or self.state.total_equity <= 0:
+            return VaRResult(method=method)
+
+        weights = {}
+        for symbol, pos in self.state.open_positions.items():
+            weights[symbol] = pos["value"] / self.state.total_equity
+
+        return self.return_tracker.compute_var(weights, self.state.total_equity, method)
+
+    def portfolio_heat_check(self) -> dict:
+        """
+        Aggregate portfolio health assessment.
+
+        Returns a dict with all risk metrics and an overall 'healthy' flag.
+        Call before every trade to get a full picture.
+        """
+        status = self.get_status()
+        drawdown = 1.0 - (self.state.total_equity / self.state.peak_equity) if self.state.peak_equity > 0 else 0.0
+
+        # Correlation matrix for open positions
+        open_symbols = list(self.state.open_positions.keys())
+        corr_matrix = self.return_tracker.get_correlation_matrix(open_symbols)
+        max_corr = 0.0
+        high_corr_pairs = []
+        if not corr_matrix.empty and len(corr_matrix) >= 2:
+            for i, s1 in enumerate(corr_matrix.columns):
+                for s2 in corr_matrix.columns[i + 1:]:
+                    c = abs(corr_matrix.loc[s1, s2])
+                    max_corr = max(max_corr, c)
+                    if c > self.limits.max_correlation:
+                        high_corr_pairs.append((s1, s2, round(c, 3)))
+
+        # VaR
+        var_result = self.get_var()
+
+        # Position concentration
+        position_pcts = {}
+        for symbol, pos in self.state.open_positions.items():
+            position_pcts[symbol] = pos["value"] / self.state.total_equity if self.state.total_equity > 0 else 0.0
+        max_concentration = max(position_pcts.values()) if position_pcts else 0.0
+
+        # Overall health
+        issues = []
+        if self.state.is_halted:
+            issues.append(f"HALTED: {self.state.halt_reason}")
+        if drawdown > self.limits.max_portfolio_drawdown * 0.8:
+            issues.append(f"Drawdown warning: {drawdown:.2%} approaching limit {self.limits.max_portfolio_drawdown:.2%}")
+        if high_corr_pairs:
+            issues.append(f"High correlation: {high_corr_pairs}")
+        if max_concentration > self.limits.max_position_size_pct * 0.9:
+            issues.append(f"Concentration warning: {max_concentration:.2%} in single position")
+        if var_result.var_99 > self.state.total_equity * 0.10:
+            issues.append(f"VaR warning: 99% VaR ${var_result.var_99:.0f} > 10% of equity")
+
+        return {
+            "healthy": len(issues) == 0,
+            "issues": issues,
+            "drawdown": round(drawdown, 4),
+            "daily_pnl": self.state.daily_pnl,
+            "open_positions": len(self.state.open_positions),
+            "max_correlation": round(max_corr, 3),
+            "high_corr_pairs": high_corr_pairs,
+            "max_concentration": round(max_concentration, 4),
+            "position_weights": {k: round(v, 4) for k, v in position_pcts.items()},
+            "var_95": var_result.var_95,
+            "var_99": var_result.var_99,
+            "cvar_95": var_result.cvar_95,
+            "cvar_99": var_result.cvar_99,
+            "is_halted": self.state.is_halted,
         }

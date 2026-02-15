@@ -11,6 +11,7 @@ from app.services.job import JobService
 from app.services.job_runner import JobRunner
 from app.services.market import MarketService
 from app.services.portfolio import PortfolioService
+from app.services.paper_trading import PaperTradingService
 from app.services.trading import TradingService
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
@@ -60,6 +61,20 @@ def get_job_service(session: SessionDep, runner: JobRunnerDep) -> JobService:
     return JobService(session, runner)
 
 
+# Singleton paper trading service (manages subprocess)
+_paper_trading_service: PaperTradingService | None = None
+
+
+def get_paper_trading_service() -> PaperTradingService:
+    global _paper_trading_service
+    if _paper_trading_service is None:
+        _paper_trading_service = PaperTradingService()
+    return _paper_trading_service
+
+
+PaperTradingServiceDep = Annotated[
+    PaperTradingService, Depends(get_paper_trading_service)
+]
 PortfolioServiceDep = Annotated[PortfolioService, Depends(get_portfolio_service)]
 MarketServiceDep = Annotated[MarketService, Depends(get_market_service)]
 TradingServiceDep = Annotated[TradingService, Depends(get_trading_service)]

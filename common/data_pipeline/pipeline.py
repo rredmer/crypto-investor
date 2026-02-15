@@ -11,6 +11,7 @@ import os
 import sys
 import time
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -300,6 +301,274 @@ def download_watchlist(
                 results[f"{symbol}_{tf}"] = {"status": "error", "error": str(e)}
 
     return results
+
+
+# ──────────────────────────────────────────────
+# Data Quality Monitoring
+# ──────────────────────────────────────────────
+
+@dataclass
+class DataQualityReport:
+    """Result of a data quality validation run."""
+    symbol: str
+    timeframe: str
+    exchange: str
+    rows: int
+    date_range: tuple[Optional[str], Optional[str]]
+    gaps: list[dict]           # [{start, end, missing_candles}]
+    nan_columns: dict          # {column: nan_count}
+    outliers: list[dict]       # [{timestamp, column, value, reason}]
+    ohlc_violations: list[dict]  # [{timestamp, reason}]
+    is_stale: bool
+    stale_hours: float
+    passed: bool
+    issues_summary: list[str]
+
+
+def detect_gaps(
+    df: pd.DataFrame,
+    timeframe: str,
+    max_allowed_gaps: int = 0,
+) -> list[dict]:
+    """
+    Detect missing candles in an OHLCV DataFrame.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        OHLCV data with datetime index
+    timeframe : str
+        Expected candle interval ('1m', '5m', '15m', '1h', '4h', '1d')
+    max_allowed_gaps : int
+        Number of consecutive missing candles before flagging
+
+    Returns
+    -------
+    list of dicts with gap details: {start, end, missing_candles}
+    """
+    if df.empty or len(df) < 2:
+        return []
+
+    tf_delta = {
+        "1m": timedelta(minutes=1),
+        "5m": timedelta(minutes=5),
+        "15m": timedelta(minutes=15),
+        "1h": timedelta(hours=1),
+        "4h": timedelta(hours=4),
+        "1d": timedelta(days=1),
+    }
+    expected_delta = tf_delta.get(timeframe, timedelta(hours=1))
+
+    gaps = []
+    index = df.index
+    for i in range(1, len(index)):
+        actual_delta = index[i] - index[i - 1]
+        if actual_delta > expected_delta * (1 + max_allowed_gaps):
+            missing = int(actual_delta / expected_delta) - 1
+            gaps.append({
+                "start": str(index[i - 1]),
+                "end": str(index[i]),
+                "missing_candles": missing,
+            })
+
+    return gaps
+
+
+def detect_stale_data(
+    df: pd.DataFrame,
+    max_stale_hours: float = 2.0,
+) -> tuple[bool, float]:
+    """
+    Check if data hasn't been updated recently.
+
+    Returns (is_stale, hours_since_last_update).
+    """
+    if df.empty:
+        return True, float("inf")
+
+    last_ts = df.index.max()
+    if last_ts.tzinfo is None:
+        last_ts = last_ts.tz_localize("UTC")
+
+    now = datetime.now(timezone.utc)
+    hours_since = (now - last_ts).total_seconds() / 3600
+
+    return hours_since > max_stale_hours, round(hours_since, 2)
+
+
+def audit_nans(df: pd.DataFrame) -> dict[str, int]:
+    """Count NaN values per column."""
+    nan_counts = df.isna().sum()
+    return {col: int(count) for col, count in nan_counts.items() if count > 0}
+
+
+def detect_outliers(
+    df: pd.DataFrame,
+    price_spike_pct: float = 0.20,
+) -> list[dict]:
+    """
+    Detect price outliers: single-candle spikes > threshold, zero volumes.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        OHLCV data
+    price_spike_pct : float
+        Maximum allowed single-candle price change (default 20%)
+    """
+    outliers = []
+
+    if df.empty or len(df) < 2:
+        return outliers
+
+    # Price spikes
+    returns = df["close"].pct_change().abs()
+    spikes = returns[returns > price_spike_pct]
+    for ts, val in spikes.items():
+        outliers.append({
+            "timestamp": str(ts),
+            "column": "close",
+            "value": round(float(df.loc[ts, "close"]), 8),
+            "reason": f"Price spike: {val:.2%} change in single candle",
+        })
+
+    # Zero volume (excluding first row which may be partial)
+    zero_vol = df[df["volume"] == 0]
+    for ts in zero_vol.index[1:]:  # skip first row
+        outliers.append({
+            "timestamp": str(ts),
+            "column": "volume",
+            "value": 0.0,
+            "reason": "Zero volume candle",
+        })
+
+    return outliers
+
+
+def check_ohlc_integrity(df: pd.DataFrame) -> list[dict]:
+    """
+    Verify OHLC constraints: high >= max(open, close), low <= min(open, close).
+    """
+    violations = []
+    if df.empty:
+        return violations
+
+    high_violation = df[df["high"] < df[["open", "close"]].max(axis=1)]
+    for ts in high_violation.index:
+        violations.append({
+            "timestamp": str(ts),
+            "reason": f"High ({df.loc[ts, 'high']}) < max(Open, Close)",
+        })
+
+    low_violation = df[df["low"] > df[["open", "close"]].min(axis=1)]
+    for ts in low_violation.index:
+        violations.append({
+            "timestamp": str(ts),
+            "reason": f"Low ({df.loc[ts, 'low']}) > min(Open, Close)",
+        })
+
+    return violations
+
+
+def validate_data(
+    symbol: str,
+    timeframe: str,
+    exchange_id: str = "binance",
+    directory: Optional[Path] = None,
+    max_stale_hours: float = 2.0,
+    price_spike_pct: float = 0.20,
+) -> DataQualityReport:
+    """
+    Run all data quality checks on a Parquet file and return a report.
+
+    Parameters
+    ----------
+    symbol : str
+        Trading pair (e.g., 'BTC/USDT')
+    timeframe : str
+        Candle timeframe
+    exchange_id : str
+        Exchange identifier
+    directory : Path, optional
+        Data directory (defaults to PROCESSED_DIR)
+    max_stale_hours : float
+        Hours after which data is considered stale
+    price_spike_pct : float
+        Single-candle price change threshold for outlier detection
+
+    Returns
+    -------
+    DataQualityReport with all check results
+    """
+    df = load_ohlcv(symbol, timeframe, exchange_id, directory)
+
+    if df.empty:
+        return DataQualityReport(
+            symbol=symbol, timeframe=timeframe, exchange=exchange_id,
+            rows=0, date_range=(None, None),
+            gaps=[], nan_columns={}, outliers=[], ohlc_violations=[],
+            is_stale=True, stale_hours=float("inf"),
+            passed=False, issues_summary=["No data found"],
+        )
+
+    gaps = detect_gaps(df, timeframe)
+    is_stale, stale_hours = detect_stale_data(df, max_stale_hours)
+    nan_cols = audit_nans(df)
+    outlier_list = detect_outliers(df, price_spike_pct)
+    ohlc_violations = check_ohlc_integrity(df)
+
+    issues = []
+    if gaps:
+        total_missing = sum(g["missing_candles"] for g in gaps)
+        issues.append(f"{len(gaps)} gaps found ({total_missing} missing candles)")
+    if is_stale:
+        issues.append(f"Data is stale ({stale_hours:.1f}h since last update)")
+    if nan_cols:
+        issues.append(f"NaN values in columns: {list(nan_cols.keys())}")
+    if outlier_list:
+        issues.append(f"{len(outlier_list)} outliers detected")
+    if ohlc_violations:
+        issues.append(f"{len(ohlc_violations)} OHLC integrity violations")
+
+    date_range = (str(df.index.min()), str(df.index.max()))
+
+    return DataQualityReport(
+        symbol=symbol, timeframe=timeframe, exchange=exchange_id,
+        rows=len(df), date_range=date_range,
+        gaps=gaps, nan_columns=nan_cols, outliers=outlier_list,
+        ohlc_violations=ohlc_violations,
+        is_stale=is_stale, stale_hours=stale_hours,
+        passed=len(issues) == 0, issues_summary=issues,
+    )
+
+
+def validate_all_data(
+    directory: Optional[Path] = None,
+    max_stale_hours: float = 26.0,
+) -> list[DataQualityReport]:
+    """
+    Run quality checks on all available Parquet files.
+
+    Uses 26h stale threshold by default (allows for weekday gaps in daily data).
+    """
+    available = list_available_data(directory)
+    reports = []
+
+    for _, row in available.iterrows():
+        report = validate_data(
+            symbol=row["symbol"],
+            timeframe=row["timeframe"],
+            exchange_id=row["exchange"],
+            directory=directory,
+            max_stale_hours=max_stale_hours,
+        )
+        reports.append(report)
+        status = "PASS" if report.passed else f"FAIL ({'; '.join(report.issues_summary)})"
+        logger.info(f"Quality check {row['symbol']} {row['timeframe']}: {status}")
+
+    passed = sum(1 for r in reports if r.passed)
+    logger.info(f"Data quality: {passed}/{len(reports)} files passed")
+    return reports
 
 
 # ──────────────────────────────────────────────

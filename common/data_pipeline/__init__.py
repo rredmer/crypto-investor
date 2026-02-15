@@ -9,6 +9,14 @@ from common.data_pipeline.pipeline import (
     to_freqtrade_format,
     to_vectorbt_format,
     to_nautilus_bars,
+    validate_data,
+    validate_all_data,
+    detect_gaps,
+    detect_stale_data,
+    audit_nans,
+    detect_outliers,
+    check_ohlc_integrity,
+    DataQualityReport,
 )
 
 __all__ = [
@@ -22,4 +30,12 @@ __all__ = [
     "to_freqtrade_format",
     "to_vectorbt_format",
     "to_nautilus_bars",
+    "validate_data",
+    "validate_all_data",
+    "detect_gaps",
+    "detect_stale_data",
+    "audit_nans",
+    "detect_outliers",
+    "check_ohlc_integrity",
+    "DataQualityReport",
 ]
