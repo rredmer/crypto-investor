@@ -255,12 +255,19 @@ class RiskManager:
         entry_price: float,
         stop_loss_price: float,
         risk_per_trade: Optional[float] = None,
+        regime_modifier: Optional[float] = None,
     ) -> float:
         """
         Calculate position size based on risk per trade.
 
         Uses the formula:
             position_size = (equity * risk_pct) / abs(entry - stop_loss)
+
+        Parameters
+        ----------
+        regime_modifier : float | None
+            Optional regime-based position sizing modifier (0-1).
+            Applied after max position cap. From StrategyRouter.route().position_size_modifier.
         """
         risk_pct = risk_per_trade or self.limits.max_single_trade_risk
         risk_amount = self.state.total_equity * risk_pct
@@ -276,6 +283,14 @@ class RiskManager:
         max_size_value = self.state.total_equity * self.limits.max_position_size_pct
         max_size = max_size_value / entry_price
         size = min(size, max_size)
+
+        # Apply regime modifier after cap
+        if regime_modifier is not None:
+            clamped = max(0.0, min(1.0, regime_modifier))
+            size *= clamped
+            logger.info(
+                f"Regime modifier applied: {clamped:.2f} → adjusted size {size:.6f}"
+            )
 
         logger.info(
             f"Position size: {size:.6f} (risk ${risk_amount:.2f}, "

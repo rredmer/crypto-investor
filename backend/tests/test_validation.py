@@ -412,6 +412,8 @@ class TestVolatilityBreakoutSignals:
             "adx_low": 15,
             "adx_high": 25,
             "rsi_low": 40,
+            "rsi_high": 70,
+            "adx_tolerance": 0.5,
             "sell_rsi_threshold": 85,
         }
         entries, exits = volatility_breakout_signals(df, params)
@@ -430,6 +432,8 @@ class TestVolatilityBreakoutSignals:
             "adx_low": 15,
             "adx_high": 25,
             "rsi_low": 40,
+            "rsi_high": 70,
+            "adx_tolerance": 0.5,
             "sell_rsi_threshold": 85,
         }
         entries, exits = volatility_breakout_signals(df, params)
@@ -444,11 +448,61 @@ class TestVolatilityBreakoutSignals:
             "adx_low": 10,
             "adx_high": 35,
             "rsi_low": 35,
+            "rsi_high": 70,
+            "adx_tolerance": 0.5,
             "sell_rsi_threshold": 80,
         }
         entries, exits = volatility_breakout_signals(df, params)
         assert entries.sum() >= 0
         assert exits.sum() >= 0
+
+
+class TestVolatilityBreakoutParams:
+    def test_rsi_high_param_respected(self):
+        """Different rsi_high values should produce different entry counts."""
+        df = generate_synthetic_ohlcv(n=5000)
+        params_narrow = {
+            "breakout_period": 20, "volume_factor": 1.2, "adx_low": 10,
+            "adx_high": 35, "rsi_low": 35, "rsi_high": 60,
+            "adx_tolerance": 0.5, "sell_rsi_threshold": 85,
+        }
+        params_wide = {
+            **params_narrow, "rsi_high": 75,
+        }
+        entries_narrow, _ = volatility_breakout_signals(df, params_narrow)
+        entries_wide, _ = volatility_breakout_signals(df, params_wide)
+        # Wider RSI band should allow at least as many entries
+        assert entries_wide.sum() >= entries_narrow.sum()
+
+    def test_adx_tolerance_param_respected(self):
+        """Higher ADX tolerance should generate more entries."""
+        df = generate_synthetic_ohlcv(n=5000)
+        params_strict = {
+            "breakout_period": 20, "volume_factor": 1.2, "adx_low": 10,
+            "adx_high": 35, "rsi_low": 35, "rsi_high": 70,
+            "adx_tolerance": 0.0, "sell_rsi_threshold": 85,
+        }
+        params_tolerant = {
+            **params_strict, "adx_tolerance": 1.0,
+        }
+        entries_strict, _ = volatility_breakout_signals(df, params_strict)
+        entries_tolerant, _ = volatility_breakout_signals(df, params_tolerant)
+        # More tolerance should allow at least as many entries
+        assert entries_tolerant.sum() >= entries_strict.sum()
+
+    def test_adx_tolerance_default(self):
+        """Without adx_tolerance param, default 0.5 should be used."""
+        df = generate_synthetic_ohlcv(n=2000)
+        params_no_key = {
+            "breakout_period": 20, "volume_factor": 1.8, "adx_low": 15,
+            "adx_high": 25, "rsi_low": 40, "sell_rsi_threshold": 85,
+        }
+        params_explicit = {
+            **params_no_key, "adx_tolerance": 0.5, "rsi_high": 70,
+        }
+        entries_default, _ = volatility_breakout_signals(df, params_no_key)
+        entries_explicit, _ = volatility_breakout_signals(df, params_explicit)
+        assert entries_default.sum() == entries_explicit.sum()
 
 
 @pytest.mark.skipif(not HAS_VBT, reason="vectorbt not installed")
@@ -463,6 +517,8 @@ class TestVolatilityBreakoutIntegration:
             "adx_low": 15,
             "adx_high": 25,
             "rsi_low": 40,
+            "rsi_high": 70,
+            "adx_tolerance": 0.5,
             "sell_rsi_threshold": 85,
         }
         entries, exits = volatility_breakout_signals(df, params)
@@ -481,6 +537,8 @@ class TestVolatilityBreakoutIntegration:
             "adx_low": [15],
             "adx_high": [25],
             "rsi_low": [40],
+            "rsi_high": [70],
+            "adx_tolerance": [0.5],
             "sell_rsi_threshold": [85],
         }
         results_df = sweep_parameters(

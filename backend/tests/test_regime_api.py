@@ -198,3 +198,36 @@ class TestRegimeAPI:
         assert data["symbol"] == "BTC/USDT"
         assert "regime" in data
         assert "confidence" in data
+
+    @pytest.mark.asyncio
+    async def test_position_size_endpoint(self, regime_client):
+        resp = await regime_client.post(
+            "/api/regime/position-size",
+            json={
+                "symbol": "BTC/USDT",
+                "entry_price": 50000,
+                "stop_loss_price": 49000,
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "position_size" in data
+        assert "regime_modifier" in data
+        assert "primary_strategy" in data
+        assert data["entry_price"] == 50000
+
+    @pytest.mark.asyncio
+    async def test_position_size_returns_regime_info(self, regime_client):
+        resp = await regime_client.post(
+            "/api/regime/position-size",
+            json={
+                "symbol": "BTC/USDT",
+                "entry_price": 100,
+                "stop_loss_price": 90,
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["regime"] != ""
+        assert data["regime_modifier"] > 0
+        assert data["position_size"] > 0

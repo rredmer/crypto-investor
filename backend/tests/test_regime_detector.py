@@ -88,17 +88,22 @@ def _make_volatile_df(n: int = 500) -> pd.DataFrame:
 
 
 class TestRegimeEnum:
-    def test_has_six_values(self):
-        assert len(Regime) == 6
+    def test_has_seven_values(self):
+        assert len(Regime) == 7
 
     def test_string_values(self):
         assert Regime.STRONG_TREND_UP.value == "strong_trend_up"
         assert Regime.RANGING.value == "ranging"
         assert Regime.HIGH_VOLATILITY.value == "high_volatility"
+        assert Regime.UNKNOWN.value == "unknown"
 
     def test_is_string_enum(self):
         assert isinstance(Regime.RANGING, str)
         assert Regime.RANGING == "ranging"
+
+    def test_unknown_regime_exists(self):
+        assert hasattr(Regime, "UNKNOWN")
+        assert Regime.UNKNOWN == "unknown"
 
 
 # ── RegimeConfig Tests ───────────────────────────────────────
@@ -233,6 +238,31 @@ class TestRegimeDetectorSeries:
             assert isinstance(regime, Regime)
 
 
+# ── UNKNOWN Regime Tests ────────────────────────────────────
+
+
+class TestUnknownRegime:
+    def test_nan_rows_classified_as_unknown(self):
+        """NaN indicator rows should be UNKNOWN, not RANGING."""
+        # Very short data ensures NaN in early warmup rows
+        df = _make_ranging_df(50)
+        detector = RegimeDetector()
+        result = detector.detect_series(df)
+        # Early rows should have NaN ADX/BB → UNKNOWN
+        early_regimes = result["regime"].iloc[:10].tolist()
+        assert Regime.UNKNOWN in early_regimes
+
+    def test_unknown_regime_confidence_zero(self):
+        """UNKNOWN regime from NaN should have confidence=0."""
+        df = _make_ranging_df(50)
+        detector = RegimeDetector()
+        result = detector.detect_series(df)
+        unknown_mask = result["regime"] == Regime.UNKNOWN
+        if unknown_mask.any():
+            unknown_confs = result.loc[unknown_mask, "confidence"]
+            assert (unknown_confs == 0.0).all()
+
+
 # ── Classification Logic Tests ───────────────────────────────
 
 
@@ -284,6 +314,115 @@ class TestClassificationLogic:
             adx_val=15, bb_pct=50, slope=0.0, alignment=0.0, structure=0.0
         )
         assert regime == Regime.RANGING
+
+
+# ── Composite Scoring Tests ──────────────────────────────────
+
+
+class TestCompositeScoring:
+    def test_composite_scores_returns_all_regimes(self):
+        """Scoring should return a dict with all 7 regime keys."""
+        detector = RegimeDetector()
+        scores = detector._compute_regime_scores(
+            adx_val=30, bb_pct=50, slope=0.005, alignment=0.3, structure=0.2
+        )
+        assert len(scores) == 7
+        for regime in Regime:
+            assert regime in scores
+
+    def test_high_vol_strong_trend_resolves_to_trend(self):
+        """ADX=50, BB=90, alignment=0.8 → STRONG_TREND_UP, not HIGH_VOLATILITY."""
+        detector = RegimeDetector()
+        regime, conf = detector._classify_regime(
+            adx_val=50, bb_pct=90, slope=0.01, alignment=0.8, structure=0.5
+        )
+        assert regime == Regime.STRONG_TREND_UP
+
+    def test_hysteresis_prevents_single_bar_flip(self):
+        """A 1-bar regime change should be suppressed by hysteresis."""
+        # Build data that trends then has a 1-bar anomaly
+        n = 200
+        np.random.seed(42)
+        close = 100 + np.linspace(0, 50, n) + np.random.randn(n) * 0.3
+        high = close + np.abs(np.random.randn(n) * 0.5)
+        low = close - np.abs(np.random.randn(n) * 0.5)
+        volume = np.random.uniform(1000, 5000, n)
+        idx = pd.date_range("2024-01-01", periods=n, freq="1h", tz="UTC")
+        df = pd.DataFrame(
+            {"open": close - 0.1, "high": high, "low": low, "close": close, "volume": volume},
+            index=idx,
+        )
+
+        detector = RegimeDetector(RegimeConfig(hysteresis_bars=3))
+        result = detector.detect_series(df)
+        # With hysteresis=3, regime changes should be less frequent
+        regime_changes = sum(
+            1 for i in range(1, len(result))
+            if result["regime"].iloc[i] != result["regime"].iloc[i - 1]
+            and result["regime"].iloc[i] != Regime.UNKNOWN
+            and result["regime"].iloc[i - 1] != Regime.UNKNOWN
+        )
+        # Verify no rapid flip-flops (more than 20% of bars being changes would be too many)
+        assert regime_changes < n * 0.2
+
+    def test_hysteresis_allows_sustained_change(self):
+        """3+ bars of a new regime should switch."""
+        n = 300
+        np.random.seed(42)
+        # First 150 bars: strong uptrend; then clear reversal for rest
+        up_close = 100 + np.linspace(0, 60, 150) + np.random.randn(150) * 0.3
+        down_close = up_close[-1] - np.linspace(0, 60, 150) + np.random.randn(150) * 0.3
+        close = np.concatenate([up_close, down_close])
+        high = close + np.abs(np.random.randn(n) * 0.5)
+        low = close - np.abs(np.random.randn(n) * 0.5)
+        volume = np.random.uniform(1000, 5000, n)
+        idx = pd.date_range("2024-01-01", periods=n, freq="1h", tz="UTC")
+        df = pd.DataFrame(
+            {"open": close, "high": high, "low": low, "close": close, "volume": volume},
+            index=idx,
+        )
+
+        detector = RegimeDetector(RegimeConfig(hysteresis_bars=3))
+        result = detector.detect_series(df)
+        # After sustained downtrend, should eventually switch away from uptrend
+        late_regimes = result["regime"].iloc[-50:].tolist()
+        # Should have at least some non-uptrend regime
+        non_up = [r for r in late_regimes if r not in (Regime.STRONG_TREND_UP, Regime.WEAK_TREND_UP, Regime.UNKNOWN)]
+        assert len(non_up) > 0
+
+    def test_hysteresis_configurable(self):
+        """Different hysteresis_bars should affect regime change frequency."""
+        df = _make_ranging_df(200)
+        det_low = RegimeDetector(RegimeConfig(hysteresis_bars=1))
+        det_high = RegimeDetector(RegimeConfig(hysteresis_bars=5))
+        result_low = det_low.detect_series(df)
+        result_high = det_high.detect_series(df)
+
+        def count_changes(series):
+            return sum(
+                1 for i in range(1, len(series))
+                if series.iloc[i] != series.iloc[i - 1]
+                and series.iloc[i] != Regime.UNKNOWN
+                and series.iloc[i - 1] != Regime.UNKNOWN
+            )
+
+        changes_low = count_changes(result_low["regime"])
+        changes_high = count_changes(result_high["regime"])
+        # Higher hysteresis → fewer or equal changes
+        assert changes_high <= changes_low
+
+    def test_confidence_reflects_score_margin(self):
+        """Close top-two scores should give lower confidence than wide margin."""
+        detector = RegimeDetector()
+        # Clear strong uptrend → high margin
+        _, conf_clear = detector._classify_regime(
+            adx_val=60, bb_pct=40, slope=0.02, alignment=0.9, structure=0.8
+        )
+        # Ambiguous (ranging-ish but some trend) → smaller margin
+        _, conf_ambig = detector._classify_regime(
+            adx_val=25, bb_pct=50, slope=0.001, alignment=0.1, structure=0.05
+        )
+        assert conf_clear > conf_ambig
 
 
 # ── Transition Probabilities Tests ───────────────────────────

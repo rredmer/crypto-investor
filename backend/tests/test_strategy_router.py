@@ -215,12 +215,69 @@ class TestRouterUtilities:
     def test_get_routing_table(self):
         router = StrategyRouter()
         table = router.get_routing_table()
-        assert len(table) == 6  # One entry per regime
+        assert len(table) == 7  # One entry per regime (including UNKNOWN)
         for regime_val, entry in table.items():
             assert "primary" in entry
             assert "weights" in entry
             assert "position_modifier" in entry
             assert "reasoning" in entry
+
+    def test_unknown_regime_routes_defensively(self):
+        router = StrategyRouter()
+        state = _make_state(Regime.UNKNOWN)
+        decision = router.route(state)
+        assert decision.primary_strategy == BMR
+        assert decision.position_size_modifier <= 0.3
+
+    def test_unknown_regime_in_all_regimes_check(self):
+        """Ensure UNKNOWN is covered in the routing table and route() works."""
+        router = StrategyRouter()
+        table = router.get_routing_table()
+        assert "unknown" in table
+
+    def test_high_vol_bullish_routes_to_vb(self):
+        """HIGH_VOLATILITY with positive alignment → VB (unchanged)."""
+        router = StrategyRouter()
+        state = RegimeState(
+            regime=Regime.HIGH_VOLATILITY, confidence=0.8, adx_value=20.0,
+            bb_width_percentile=90.0, ema_slope=0.001,
+            trend_alignment=0.3, price_structure_score=0.1,
+        )
+        decision = router.route(state)
+        assert decision.primary_strategy == VB
+
+    def test_high_vol_bearish_routes_to_bmr(self):
+        """HIGH_VOLATILITY with negative alignment → BMR defensive."""
+        router = StrategyRouter()
+        state = RegimeState(
+            regime=Regime.HIGH_VOLATILITY, confidence=0.8, adx_value=20.0,
+            bb_width_percentile=90.0, ema_slope=-0.005,
+            trend_alignment=-0.5, price_structure_score=-0.3,
+        )
+        decision = router.route(state)
+        assert decision.primary_strategy == BMR
+
+    def test_high_vol_bearish_reduced_modifier(self):
+        """Bearish HIGH_VOLATILITY should have modifier = 0.5."""
+        router = StrategyRouter()
+        state = RegimeState(
+            regime=Regime.HIGH_VOLATILITY, confidence=0.8, adx_value=20.0,
+            bb_width_percentile=90.0, ema_slope=-0.005,
+            trend_alignment=-0.5, price_structure_score=-0.3,
+        )
+        decision = router.route(state)
+        assert decision.position_size_modifier == 0.5
+
+    def test_high_vol_neutral_routes_to_vb(self):
+        """HIGH_VOLATILITY with zero alignment → VB (unchanged)."""
+        router = StrategyRouter()
+        state = RegimeState(
+            regime=Regime.HIGH_VOLATILITY, confidence=0.8, adx_value=20.0,
+            bb_width_percentile=90.0, ema_slope=0.0,
+            trend_alignment=0.0, price_structure_score=0.0,
+        )
+        decision = router.route(state)
+        assert decision.primary_strategy == VB
 
     def test_custom_routing_config(self):
         custom = {

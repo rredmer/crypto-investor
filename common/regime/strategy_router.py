@@ -88,6 +88,12 @@ DEFAULT_ROUTING: dict[Regime, dict] = {
         "position_modifier": 0.8,
         "reasoning": "High volatility: breakout strategy at 80% size to manage risk",
     },
+    Regime.UNKNOWN: {
+        "primary": BMR,
+        "weights": [StrategyWeight(BMR, 1.0, 0.3)],
+        "position_modifier": 0.3,
+        "reasoning": "Unknown regime (warmup/insufficient data): conservative at 30% size",
+    },
 }
 
 
@@ -110,6 +116,15 @@ class StrategyRouter:
         if mapping is None:
             # Fallback to RANGING if unknown
             mapping = self.routing[Regime.RANGING]
+
+        # Override: bearish high volatility → defensive BMR instead of VB
+        if state.regime == Regime.HIGH_VOLATILITY and state.trend_alignment < 0:
+            mapping = {
+                "primary": BMR,
+                "weights": [StrategyWeight(BMR, 1.0, 0.5)],
+                "position_modifier": 0.5,
+                "reasoning": "High volatility + bearish alignment: defensive BMR at 50%",
+            }
 
         position_modifier = mapping["position_modifier"]
 

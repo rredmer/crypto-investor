@@ -62,6 +62,8 @@ PARAM_GRID = {
     "adx_low": [10, 15, 20],
     "adx_high": [20, 25, 35],
     "rsi_low": [35, 40, 50],
+    "rsi_high": [60, 65, 70, 75],
+    "adx_tolerance": [0.0, 0.5, 1.0],
     "sell_rsi_threshold": [80, 85, 95],
 }
 
@@ -97,7 +99,8 @@ def volatility_breakout_signals(
     bb_width = bb["bb_width"]
     bb_width_expanding = bb_width > bb_width.shift(1)
 
-    rsi_high = 70  # Fixed as in Freqtrade strategy
+    rsi_high = int(params.get("rsi_high", 70))
+    adx_tolerance = float(params.get("adx_tolerance", 0.5))
 
     # Entry: all conditions must be true
     entries = (
@@ -106,7 +109,7 @@ def volatility_breakout_signals(
         & bb_width_expanding  # Volatility expanding
         & (adx_14 >= float(params["adx_low"]))  # ADX in range
         & (adx_14 <= float(params["adx_high"]))
-        & (adx_14 > adx_14.shift(1))  # ADX rising
+        & (adx_14 > adx_14.shift(1) - adx_tolerance)  # ADX rising (with tolerance)
         & (rsi_14 >= float(params["rsi_low"]))  # RSI in neutral zone
         & (rsi_14 <= rsi_high)
         & (volume > 0)

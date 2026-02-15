@@ -8,6 +8,7 @@ import { DataManagement } from "./pages/DataManagement";
 import { Screening } from "./pages/Screening";
 import { RiskManagement } from "./pages/RiskManagement";
 import { Backtesting } from "./pages/Backtesting";
+import { RegimeDashboard } from "./pages/RegimeDashboard";
 import { Settings } from "./pages/Settings";
 
 export default function App() {
@@ -21,6 +22,7 @@ export default function App() {
         <Route path="/data" element={<DataManagement />} />
         <Route path="/screening" element={<Screening />} />
         <Route path="/risk" element={<RiskManagement />} />
+        <Route path="/regime" element={<RegimeDashboard />} />
         <Route path="/backtest" element={<Backtesting />} />
         <Route path="/settings" element={<Settings />} />
       </Route>

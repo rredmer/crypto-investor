@@ -28,6 +28,7 @@ class Regime(str, Enum):
     WEAK_TREND_DOWN = "weak_trend_down"
     STRONG_TREND_DOWN = "strong_trend_down"
     HIGH_VOLATILITY = "high_volatility"
+    UNKNOWN = "unknown"
 
 
 @dataclass
@@ -49,6 +50,7 @@ class RegimeConfig:
     bb_period: int = 20
     bb_std: float = 2.0
     adx_period: int = 14
+    hysteresis_bars: int = 3
 
 
 @dataclass
@@ -70,6 +72,9 @@ class RegimeDetector:
 
     def __init__(self, config: RegimeConfig | None = None) -> None:
         self.config = config or RegimeConfig()
+        # Hysteresis state for detect_series
+        self._last_regime: Regime | None = None
+        self._regime_hold_count: int = 0
 
     def detect(self, df: pd.DataFrame) -> RegimeState:
         """Detect the regime from the latest row of an OHLCV DataFrame."""
@@ -118,9 +123,13 @@ class RegimeDetector:
         result["trend_alignment"] = self._compute_trend_alignment(df)
         result["price_structure_score"] = self._compute_price_structure(df)
 
-        # Per-row regime classification
+        # Per-row regime classification with hysteresis
         regimes = []
         confidences = []
+        last_regime: Regime | None = None
+        hold_count = 0
+        hysteresis_bars = cfg.hysteresis_bars
+
         for i in range(len(result)):
             adx_val = result["adx_value"].iloc[i]
             bb_pct = result["bb_width_percentile"].iloc[i]
@@ -129,18 +138,38 @@ class RegimeDetector:
             structure = result["price_structure_score"].iloc[i]
 
             if pd.isna(adx_val) or pd.isna(bb_pct):
-                regimes.append(Regime.RANGING)
+                regimes.append(Regime.UNKNOWN)
                 confidences.append(0.0)
+                # Don't update hysteresis state for unknown
+                continue
+
+            raw_regime, conf = self._classify_regime(
+                float(adx_val),
+                float(bb_pct),
+                float(slope) if not pd.isna(slope) else 0.0,
+                float(alignment) if not pd.isna(alignment) else 0.0,
+                float(structure) if not pd.isna(structure) else 0.0,
+            )
+
+            # Apply hysteresis: only switch after N consecutive bars agree
+            if last_regime is None or last_regime == Regime.UNKNOWN:
+                # First valid regime or after unknown — accept immediately
+                last_regime = raw_regime
+                hold_count = 0
+            elif raw_regime != last_regime:
+                hold_count += 1
+                if hold_count >= hysteresis_bars:
+                    # Sustained change — switch
+                    last_regime = raw_regime
+                    hold_count = 0
+                else:
+                    # Not enough bars — hold previous regime
+                    raw_regime = last_regime
             else:
-                regime, conf = self._classify_regime(
-                    float(adx_val),
-                    float(bb_pct),
-                    float(slope) if not pd.isna(slope) else 0.0,
-                    float(alignment) if not pd.isna(alignment) else 0.0,
-                    float(structure) if not pd.isna(structure) else 0.0,
-                )
-                regimes.append(regime)
-                confidences.append(conf)
+                hold_count = 0
+
+            regimes.append(raw_regime)
+            confidences.append(conf)
 
         result["regime"] = regimes
         result["confidence"] = confidences
@@ -220,6 +249,101 @@ class RegimeDetector:
 
     # ── Classification ─────────────────────────────────────────
 
+    def _compute_regime_scores(
+        self,
+        adx_val: float,
+        bb_pct: float,
+        slope: float,
+        alignment: float,
+        structure: float,
+    ) -> dict[Regime, float]:
+        """
+        Compute composite 0-1 score for each regime.
+
+        Scoring uses weighted indicator contributions so that a high-vol
+        strong uptrend (ADX=50, BB=90) resolves to STRONG_TREND_UP rather
+        than HIGH_VOLATILITY.
+        """
+        cfg = self.config
+
+        # Normalize indicators to 0-1 ranges
+        adx_norm = min(adx_val / 100.0, 1.0)
+        bb_norm = min(bb_pct / 100.0, 1.0)
+        slope_abs = min(abs(slope) * 50, 1.0)  # slope ~0.02 → 1.0
+        align_abs = min(abs(alignment), 1.0)
+        struct_abs = min(abs(structure), 1.0)
+
+        # Directional signals
+        is_up = 1.0 if slope > 0 and alignment > 0 else 0.0
+        is_down = 1.0 if slope < 0 and alignment < 0 else 0.0
+
+        # ADX strength tiers
+        adx_strong_score = max(0.0, (adx_val - cfg.adx_strong) / 30)  # 0 at threshold, ~1 at 70
+        adx_weak_score = max(0.0, min(1.0, (adx_val - cfg.adx_weak) / (cfg.adx_strong - cfg.adx_weak)))
+        adx_low_score = max(0.0, 1.0 - adx_val / cfg.adx_weak)  # High when ADX < weak
+
+        scores: dict[Regime, float] = {}
+
+        # STRONG_TREND_UP: high ADX + positive direction signals
+        scores[Regime.STRONG_TREND_UP] = (
+            adx_strong_score * 0.35
+            + align_abs * is_up * 0.25
+            + slope_abs * is_up * 0.15
+            + struct_abs * (1.0 if structure > 0 else 0.0) * 0.15
+            + (0.1 if adx_val > cfg.adx_strong and alignment > cfg.strong_alignment_threshold else 0.0)
+        )
+
+        # STRONG_TREND_DOWN: high ADX + negative direction signals
+        scores[Regime.STRONG_TREND_DOWN] = (
+            adx_strong_score * 0.35
+            + align_abs * is_down * 0.25
+            + slope_abs * is_down * 0.15
+            + struct_abs * (1.0 if structure < 0 else 0.0) * 0.15
+            + (0.1 if adx_val > cfg.adx_strong and alignment < -cfg.strong_alignment_threshold else 0.0)
+        )
+
+        # WEAK_TREND_UP: mid ADX + positive direction
+        scores[Regime.WEAK_TREND_UP] = (
+            adx_weak_score * 0.25
+            + align_abs * is_up * 0.3
+            + slope_abs * is_up * 0.15
+            + max(0.0, structure) * 0.1
+            + (0.2 if alignment > 0 and slope > 0 else 0.0)
+        ) * (1.0 if adx_val <= cfg.adx_strong else 0.5)  # Penalty if ADX too strong
+
+        # WEAK_TREND_DOWN: mid ADX + negative direction
+        scores[Regime.WEAK_TREND_DOWN] = (
+            adx_weak_score * 0.25
+            + align_abs * is_down * 0.3
+            + slope_abs * is_down * 0.15
+            + max(0.0, -structure) * 0.1
+            + (0.2 if alignment < 0 and slope < 0 else 0.0)
+        ) * (1.0 if adx_val <= cfg.adx_strong else 0.5)
+
+        # HIGH_VOLATILITY: high BB width + low ADX (directionless volatility)
+        scores[Regime.HIGH_VOLATILITY] = (
+            bb_norm * 0.4
+            + adx_low_score * 0.3
+            + (0.2 if bb_pct > cfg.bb_high_vol_pct else 0.0)
+            + (0.1 if align_abs < 0.3 else 0.0)  # Bonus when no clear direction
+        )
+
+        # RANGING: low ADX + low slope + low alignment
+        # Penalize when there IS directional signal
+        direction_penalty = 1.0 - (align_abs * 0.5 + slope_abs * 0.3)
+        scores[Regime.RANGING] = (
+            adx_low_score * 0.3
+            + (1.0 - slope_abs) * 0.15
+            + (1.0 - align_abs) * 0.2
+            + (1.0 - bb_norm) * 0.1
+            + (0.1 if adx_val < cfg.adx_weak else 0.0)
+        ) * max(0.3, direction_penalty)
+
+        # UNKNOWN never wins via scoring (only from NaN path)
+        scores[Regime.UNKNOWN] = 0.0
+
+        return scores
+
     def _classify_regime(
         self,
         adx_val: float,
@@ -229,64 +353,27 @@ class RegimeDetector:
         structure: float,
     ) -> tuple[Regime, float]:
         """
-        Classify regime using weighted scoring of sub-indicators.
+        Classify regime using composite scoring of sub-indicators.
+
+        Computes a 0-1 score per regime, picks the highest scorer.
+        Confidence reflects the margin between top two scores.
 
         Returns (regime, confidence) where confidence is 0-1.
         """
-        cfg = self.config
+        scores = self._compute_regime_scores(adx_val, bb_pct, slope, alignment, structure)
 
-        # HIGH_VOLATILITY: high BB width + low trend strength
-        if bb_pct > cfg.bb_high_vol_pct and adx_val < cfg.adx_weak:
-            confidence = min(1.0, (bb_pct - cfg.bb_high_vol_pct) / 20 * 0.5 + 0.5)
-            return Regime.HIGH_VOLATILITY, confidence
+        # Exclude UNKNOWN from winner selection
+        candidates = {r: s for r, s in scores.items() if r != Regime.UNKNOWN}
+        sorted_regimes = sorted(candidates.items(), key=lambda x: x[1], reverse=True)
 
-        # STRONG_TREND_UP
-        if (
-            adx_val > cfg.adx_strong
-            and alignment > cfg.strong_alignment_threshold
-            and slope > 0
-            and structure > cfg.strong_structure_threshold
-        ):
-            confidence = min(
-                1.0,
-                (adx_val - cfg.adx_strong) / 20 * 0.3
-                + alignment * 0.3
-                + min(structure, 1.0) * 0.2
-                + 0.2,
-            )
-            return Regime.STRONG_TREND_UP, confidence
+        best_regime, best_score = sorted_regimes[0]
+        second_score = sorted_regimes[1][1] if len(sorted_regimes) > 1 else 0.0
 
-        # STRONG_TREND_DOWN
-        if (
-            adx_val > cfg.adx_strong
-            and alignment < -cfg.strong_alignment_threshold
-            and slope < 0
-            and structure < -cfg.strong_structure_threshold
-        ):
-            confidence = min(
-                1.0,
-                (adx_val - cfg.adx_strong) / 20 * 0.3
-                + abs(alignment) * 0.3
-                + min(abs(structure), 1.0) * 0.2
-                + 0.2,
-            )
-            return Regime.STRONG_TREND_DOWN, confidence
+        # Confidence: base from best score + margin bonus
+        margin = best_score - second_score
+        confidence = min(1.0, max(0.3, best_score * 0.6 + margin * 2.0 + 0.2))
 
-        # WEAK_TREND_UP
-        if cfg.adx_weak <= adx_val <= cfg.adx_strong and alignment > 0 and slope > 0:
-            strength = (adx_val - cfg.adx_weak) / (cfg.adx_strong - cfg.adx_weak)
-            confidence = 0.3 + strength * 0.4 + alignment * 0.15 + max(0, structure) * 0.15
-            return Regime.WEAK_TREND_UP, min(1.0, confidence)
-
-        # WEAK_TREND_DOWN
-        if cfg.adx_weak <= adx_val <= cfg.adx_strong and alignment < 0 and slope < 0:
-            strength = (adx_val - cfg.adx_weak) / (cfg.adx_strong - cfg.adx_weak)
-            confidence = 0.3 + strength * 0.4 + abs(alignment) * 0.15 + min(0, -structure) * 0.15
-            return Regime.WEAK_TREND_DOWN, min(1.0, confidence)
-
-        # RANGING (default)
-        confidence = max(0.3, 1.0 - adx_val / cfg.adx_strong)
-        return Regime.RANGING, min(1.0, confidence)
+        return best_regime, confidence
 
     # ── Transition probabilities ───────────────────────────────
 

@@ -81,6 +81,7 @@ class VolatilityBreakout(IStrategy):
     rsi_low = IntParameter(35, 50, default=40, space="buy", optimize=True)
     rsi_high = IntParameter(60, 75, default=70, space="buy", optimize=True)
     sell_rsi_threshold = IntParameter(80, 95, default=85, space="sell", optimize=True)
+    adx_tolerance = DecimalParameter(0.0, 1.5, default=0.5, decimals=1, space="buy", optimize=True)
     atr_multiplier = DecimalParameter(1.0, 2.5, default=1.5, decimals=1, space="buy", optimize=True)
 
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
@@ -132,7 +133,7 @@ class VolatilityBreakout(IStrategy):
             # ADX in emerging-trend range and rising
             dataframe["adx"] >= self.adx_low.value,
             dataframe["adx"] <= self.adx_high.value,
-            dataframe["adx"] > dataframe["adx_prev"],
+            dataframe["adx"] > dataframe["adx_prev"] - self.adx_tolerance.value,
 
             # RSI in neutral zone (fresh move, not exhausted)
             dataframe["rsi"] >= self.rsi_low.value,

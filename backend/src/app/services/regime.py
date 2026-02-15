@@ -19,6 +19,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from common.regime.regime_detector import RegimeDetector, RegimeConfig, RegimeState
 from common.regime.strategy_router import StrategyRouter, RoutingDecision
+from common.risk.risk_manager import RiskManager
 
 logger = logging.getLogger("regime_service")
 
@@ -114,6 +115,47 @@ class RegimeService:
             if rec is not None:
                 results.append(rec)
         return results
+
+    def get_position_size(
+        self,
+        symbol: str,
+        entry_price: float,
+        stop_loss_price: float,
+        risk_manager: RiskManager,
+    ) -> dict | None:
+        """
+        Bridge regime routing and risk manager for integrated position sizing.
+
+        Detects the current regime for the symbol, gets the routing decision,
+        and passes the regime modifier into the risk manager's position sizing.
+        """
+        df = self._load_data(symbol)
+        if df is None or df.empty:
+            if symbol in self._cache:
+                state, _ = self._cache[symbol]
+            else:
+                return None
+        else:
+            state = self.detector.detect(df)
+
+        decision = self.router.route(state)
+        regime_modifier = decision.position_size_modifier
+
+        size = risk_manager.calculate_position_size(
+            entry_price=entry_price,
+            stop_loss_price=stop_loss_price,
+            regime_modifier=regime_modifier,
+        )
+
+        return {
+            "symbol": symbol,
+            "regime": state.regime.value,
+            "regime_modifier": regime_modifier,
+            "position_size": round(size, 8),
+            "entry_price": entry_price,
+            "stop_loss_price": stop_loss_price,
+            "primary_strategy": decision.primary_strategy,
+        }
 
     def _load_data(self, symbol: str) -> pd.DataFrame | None:
         """Load OHLCV data for a symbol from the shared pipeline."""

@@ -223,6 +223,40 @@ class TestRiskManager:
         assert pnl == pytest.approx(200.0)  # 0.1 * (50000-48000)
 
 
+class TestRegimeModifier:
+    def test_regime_modifier_reduces_size(self):
+        rm = RiskManager()
+        full_size = rm.calculate_position_size(50000, 49000)
+        half_size = rm.calculate_position_size(50000, 49000, regime_modifier=0.5)
+        assert half_size == pytest.approx(full_size * 0.5, rel=1e-6)
+
+    def test_regime_modifier_none_no_change(self):
+        rm = RiskManager()
+        size_none = rm.calculate_position_size(50000, 49000, regime_modifier=None)
+        size_default = rm.calculate_position_size(50000, 49000)
+        assert size_none == pytest.approx(size_default, rel=1e-6)
+
+    def test_regime_modifier_zero_returns_zero(self):
+        rm = RiskManager()
+        size = rm.calculate_position_size(50000, 49000, regime_modifier=0.0)
+        assert size == 0.0
+
+    def test_regime_modifier_one_no_change(self):
+        rm = RiskManager()
+        size_one = rm.calculate_position_size(50000, 49000, regime_modifier=1.0)
+        size_default = rm.calculate_position_size(50000, 49000)
+        assert size_one == pytest.approx(size_default, rel=1e-6)
+
+    def test_regime_modifier_applied_after_cap(self):
+        """Modifier should be applied after max position cap, not before."""
+        rm = RiskManager()
+        # This will hit the max position cap
+        capped_size = rm.calculate_position_size(50000, 49000)
+        modified_size = rm.calculate_position_size(50000, 49000, regime_modifier=0.5)
+        # Modified size should be exactly 50% of capped size
+        assert modified_size == pytest.approx(capped_size * 0.5, rel=1e-6)
+
+
 class TestCorrelationCheck:
     def _rm_with_correlated_data(self):
         """Build a RiskManager with correlated price data for BTC and ETH."""

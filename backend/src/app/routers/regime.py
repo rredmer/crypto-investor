@@ -3,6 +3,8 @@ from fastapi import APIRouter, Query
 from app.deps import RegimeServiceDep
 from app.schemas.regime import (
     RegimeHistoryEntry,
+    RegimePositionSizeRequest,
+    RegimePositionSizeResponse,
     RegimeStateResponse,
     RoutingDecisionResponse,
 )
@@ -65,3 +67,30 @@ async def get_recommendation(symbol: str, service: RegimeServiceDep) -> dict:
 async def get_all_recommendations(service: RegimeServiceDep) -> list:
     """Get strategy recommendations for all tracked symbols."""
     return service.get_all_recommendations()
+
+
+@router.post("/position-size", response_model=RegimePositionSizeResponse)
+async def get_position_size(
+    request: RegimePositionSizeRequest, service: RegimeServiceDep
+) -> dict:
+    """Calculate position size with regime-adjusted modifier."""
+    from common.risk.risk_manager import RiskManager
+
+    risk_manager = RiskManager()
+    result = service.get_position_size(
+        symbol=request.symbol,
+        entry_price=request.entry_price,
+        stop_loss_price=request.stop_loss_price,
+        risk_manager=risk_manager,
+    )
+    if result is None:
+        return {
+            "symbol": request.symbol,
+            "regime": "unknown",
+            "regime_modifier": 0.0,
+            "position_size": 0.0,
+            "entry_price": request.entry_price,
+            "stop_loss_price": request.stop_loss_price,
+            "primary_strategy": "none",
+        }
+    return result

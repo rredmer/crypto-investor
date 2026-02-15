@@ -35,3 +35,19 @@ class RegimeHistoryEntry(BaseModel):
     confidence: float
     adx_value: float
     bb_width_percentile: float
+
+
+class RegimePositionSizeRequest(BaseModel):
+    symbol: str
+    entry_price: float
+    stop_loss_price: float
+
+
+class RegimePositionSizeResponse(BaseModel):
+    symbol: str
+    regime: str
+    regime_modifier: float
+    position_size: float
+    entry_price: float
+    stop_loss_price: float
+    primary_strategy: str

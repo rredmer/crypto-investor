@@ -144,6 +144,62 @@ export interface StrategyInfo {
   file_path: string;
 }
 
+// Regime types
+export type RegimeType =
+  | "strong_trend_up"
+  | "weak_trend_up"
+  | "ranging"
+  | "weak_trend_down"
+  | "strong_trend_down"
+  | "high_volatility"
+  | "unknown";
+
+export interface RegimeState {
+  symbol: string;
+  regime: RegimeType;
+  confidence: number;
+  adx_value: number;
+  bb_width_percentile: number;
+  ema_slope: number;
+  trend_alignment: number;
+  price_structure_score: number;
+  transition_probabilities: Record<string, number>;
+}
+
+export interface StrategyWeight {
+  strategy_name: string;
+  weight: number;
+  position_size_factor: number;
+}
+
+export interface RoutingDecision {
+  symbol: string;
+  regime: RegimeType;
+  confidence: number;
+  primary_strategy: string;
+  weights: StrategyWeight[];
+  position_size_modifier: number;
+  reasoning: string;
+}
+
+export interface RegimeHistoryEntry {
+  timestamp: string;
+  regime: RegimeType;
+  confidence: number;
+  adx_value: number;
+  bb_width_percentile: number;
+}
+
+export interface RegimePositionSize {
+  symbol: string;
+  regime: RegimeType;
+  regime_modifier: number;
+  position_size: number;
+  entry_price: number;
+  stop_loss_price: number;
+  primary_strategy: string;
+}
+
 // Platform types
 export interface FrameworkStatus {
   name: string;

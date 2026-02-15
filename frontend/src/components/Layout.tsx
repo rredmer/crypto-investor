@@ -7,6 +7,7 @@ import {
   Database,
   Search,
   Shield,
+  Activity,
   Play,
   Settings,
 } from "lucide-react";
@@ -19,6 +20,7 @@ const navItems = [
   { to: "/data", icon: Database, label: "Data" },
   { to: "/screening", icon: Search, label: "Screening" },
   { to: "/risk", icon: Shield, label: "Risk" },
+  { to: "/regime", icon: Activity, label: "Regime" },
   { to: "/backtest", icon: Play, label: "Backtest" },
   { to: "/settings", icon: Settings, label: "Settings" },
 ];
