@@ -32,6 +32,7 @@ from validation_engine import (
 )
 from validate_crypto_investor_v1 import crypto_investor_v1_signals
 from validate_bollinger_mean_reversion import bollinger_mr_signals
+from validate_volatility_breakout import volatility_breakout_signals
 
 
 # ── ADX Indicator Tests ───────────────────────────────────────
@@ -397,3 +398,94 @@ class TestIntegrationWithVBT:
             loaded = json.load(f)
         assert loaded["strategy_name"] == "BMR_test"
         assert "gate2" in loaded
+
+
+# ── VolatilityBreakout Signal Tests ──────────────────────────
+
+
+class TestVolatilityBreakoutSignals:
+    def test_returns_boolean_series(self):
+        df = generate_synthetic_ohlcv(n=1000)
+        params = {
+            "breakout_period": 20,
+            "volume_factor": 1.8,
+            "adx_low": 15,
+            "adx_high": 25,
+            "rsi_low": 40,
+            "sell_rsi_threshold": 85,
+        }
+        entries, exits = volatility_breakout_signals(df, params)
+        assert isinstance(entries, pd.Series)
+        assert isinstance(exits, pd.Series)
+        assert entries.dtype == bool
+        assert exits.dtype == bool
+        assert len(entries) == len(df)
+        assert len(exits) == len(df)
+
+    def test_no_nans_in_signals(self):
+        df = generate_synthetic_ohlcv(n=1000)
+        params = {
+            "breakout_period": 20,
+            "volume_factor": 1.8,
+            "adx_low": 15,
+            "adx_high": 25,
+            "rsi_low": 40,
+            "sell_rsi_threshold": 85,
+        }
+        entries, exits = volatility_breakout_signals(df, params)
+        assert not entries.isna().any()
+        assert not exits.isna().any()
+
+    def test_generates_some_signals(self):
+        df = generate_synthetic_ohlcv(n=5000)
+        params = {
+            "breakout_period": 15,
+            "volume_factor": 1.2,
+            "adx_low": 10,
+            "adx_high": 35,
+            "rsi_low": 35,
+            "sell_rsi_threshold": 80,
+        }
+        entries, exits = volatility_breakout_signals(df, params)
+        assert entries.sum() >= 0
+        assert exits.sum() >= 0
+
+
+@pytest.mark.skipif(not HAS_VBT, reason="vectorbt not installed")
+class TestVolatilityBreakoutIntegration:
+    def test_vb_backtest_returns_metrics(self):
+        from validation_engine import _run_backtest
+
+        df = generate_synthetic_ohlcv(n=2000)
+        params = {
+            "breakout_period": 20,
+            "volume_factor": 1.8,
+            "adx_low": 15,
+            "adx_high": 25,
+            "rsi_low": 40,
+            "sell_rsi_threshold": 85,
+        }
+        entries, exits = volatility_breakout_signals(df, params)
+        metrics = _run_backtest(df["close"], entries, exits, fees=0.0015, sl_stop=0.03)
+        assert "sharpe_ratio" in metrics
+        assert "total_return" in metrics
+        assert "max_drawdown" in metrics
+
+    def test_vb_sweep_tiny_grid(self):
+        from validation_engine import sweep_parameters
+
+        df = generate_synthetic_ohlcv(n=2000)
+        tiny_grid = {
+            "breakout_period": [20],
+            "volume_factor": [1.8],
+            "adx_low": [15],
+            "adx_high": [25],
+            "rsi_low": [40],
+            "sell_rsi_threshold": [85],
+        }
+        results_df = sweep_parameters(
+            df, volatility_breakout_signals, tiny_grid, sl_stop=0.03
+        )
+        assert len(results_df) == 1
+        assert "sharpe_ratio" in results_df.columns
+        assert "passes_gate2" in results_df.columns

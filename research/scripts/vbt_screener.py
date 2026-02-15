@@ -26,7 +26,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from common.data_pipeline.pipeline import load_ohlcv, PROCESSED_DIR
-from common.indicators.technical import sma, ema, rsi, atr_indicator
+from common.indicators.technical import sma, ema, rsi, atr_indicator, adx, bollinger_bands
 
 logger = logging.getLogger("vbt_screener")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -270,6 +270,93 @@ def screen_ema_rsi_combo(
     return results_df
 
 
+def screen_volatility_breakout(
+    df: pd.DataFrame,
+    breakout_periods: list = None,
+    volume_factors: list = None,
+    adx_ranges: list = None,
+    fees: float = 0.001,
+) -> pd.DataFrame:
+    """
+    Screen volatility breakout strategies.
+
+    Buy when close breaks above N-period high with volume spike,
+    expanding BB width, and ADX in emerging-trend range.
+    Sell when RSI > 85 (exhaustion) or price crosses below EMA(20).
+    """
+    if breakout_periods is None:
+        breakout_periods = [10, 15, 20, 25, 30]
+    if volume_factors is None:
+        volume_factors = [1.2, 1.5, 2.0, 2.5]
+    if adx_ranges is None:
+        adx_ranges = [(10, 25), (15, 30), (15, 25)]
+
+    close = df["close"]
+    high = df["high"]
+    volume = df["volume"]
+    rsi_14 = rsi(close, 14)
+    adx_14 = adx(df, 14)
+    ema_20 = ema(close, 20)
+    volume_sma = sma(volume, 20)
+    volume_ratio = volume / volume_sma
+    bb = bollinger_bands(close, 20, 2.0)
+    bb_width = bb["bb_width"]
+    bb_width_expanding = bb_width > bb_width.shift(1)
+
+    results = []
+
+    for bp in breakout_periods:
+        n_high = high.rolling(window=bp).max().shift(1)
+        breakout = close > n_high
+
+        for vf in volume_factors:
+            vol_ok = volume_ratio > vf
+
+            for adx_lo, adx_hi in adx_ranges:
+                adx_ok = (adx_14 >= adx_lo) & (adx_14 <= adx_hi) & (adx_14 > adx_14.shift(1))
+                rsi_ok = (rsi_14 >= 40) & (rsi_14 <= 70)
+
+                entries = breakout & vol_ok & bb_width_expanding & adx_ok & rsi_ok & (volume > 0)
+                exits = (rsi_14 > 85) | (
+                    (close < ema_20)
+                    & (close.shift(1) >= ema_20.shift(1))
+                    & (volume_ratio > 1.0)
+                )
+                entries = entries.fillna(False)
+                exits = exits.fillna(False)
+
+                try:
+                    pf = vbt.Portfolio.from_signals(
+                        close,
+                        entries=entries,
+                        exits=exits,
+                        fees=fees,
+                        freq="1h",
+                        init_cash=10000,
+                        sl_stop=0.03,
+                    )
+                    results.append({
+                        "breakout_period": bp,
+                        "volume_factor": vf,
+                        "adx_low": adx_lo,
+                        "adx_high": adx_hi,
+                        "total_return": pf.total_return(),
+                        "sharpe_ratio": pf.sharpe_ratio(),
+                        "max_drawdown": pf.max_drawdown(),
+                        "win_rate": pf.trades.win_rate() if pf.trades.count() > 0 else 0,
+                        "profit_factor": pf.trades.profit_factor() if pf.trades.count() > 0 else 0,
+                        "num_trades": pf.trades.count(),
+                    })
+                except Exception as e:
+                    logger.debug(f"Skipping VB({bp}, {vf}, {adx_lo}-{adx_hi}): {e}")
+
+    results_df = pd.DataFrame(results)
+    if not results_df.empty:
+        results_df = results_df.sort_values("sharpe_ratio", ascending=False)
+    logger.info(f"Volatility breakout screening complete: {len(results_df)} combos tested")
+    return results_df
+
+
 # ──────────────────────────────────────────────
 # Composite Screener
 # ──────────────────────────────────────────────
@@ -320,6 +407,13 @@ def run_full_screen(
         results["ema_rsi_combo"] = screen_ema_rsi_combo(df, fees=fees)
     except Exception as e:
         logger.error(f"EMA+RSI screen failed: {e}")
+
+    # 5. Volatility Breakout
+    logger.info("Running Volatility breakout screen...")
+    try:
+        results["volatility_breakout"] = screen_volatility_breakout(df, fees=fees)
+    except Exception as e:
+        logger.error(f"Volatility breakout screen failed: {e}")
 
     # Save results
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

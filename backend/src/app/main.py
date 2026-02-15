@@ -19,6 +19,7 @@ from app.routers import (
     paper_trading,
     platform,
     portfolio,
+    regime,
     risk,
     screening,
     trading,
@@ -79,6 +80,7 @@ app.include_router(risk.router, prefix="/api")
 app.include_router(backtest.router, prefix="/api")
 app.include_router(indicators.router, prefix="/api")
 app.include_router(paper_trading.router, prefix="/api")
+app.include_router(regime.router, prefix="/api")
 app.include_router(platform.router, prefix="/api")
 
 

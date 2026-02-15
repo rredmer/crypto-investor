@@ -12,6 +12,7 @@ from app.services.job_runner import JobRunner
 from app.services.market import MarketService
 from app.services.portfolio import PortfolioService
 from app.services.paper_trading import PaperTradingService
+from app.services.regime import RegimeService
 from app.services.trading import TradingService
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
@@ -75,6 +76,19 @@ def get_paper_trading_service() -> PaperTradingService:
 PaperTradingServiceDep = Annotated[
     PaperTradingService, Depends(get_paper_trading_service)
 ]
+
+# Singleton regime service
+_regime_service: RegimeService | None = None
+
+
+def get_regime_service() -> RegimeService:
+    global _regime_service
+    if _regime_service is None:
+        _regime_service = RegimeService()
+    return _regime_service
+
+
+RegimeServiceDep = Annotated[RegimeService, Depends(get_regime_service)]
 PortfolioServiceDep = Annotated[PortfolioService, Depends(get_portfolio_service)]
 MarketServiceDep = Annotated[MarketService, Depends(get_market_service)]
 TradingServiceDep = Annotated[TradingService, Depends(get_trading_service)]
