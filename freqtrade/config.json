@@ -31,7 +31,7 @@
         "order_book_top": 1
     },
     "exchange": {
-        "name": "kraken",
+        "name": "binanceus",
         "key": "",
         "secret": "",
         "ccxt_config": {},
@@ -40,14 +40,7 @@
         "pair_whitelist": [
             "BTC/USDT",
             "ETH/USDT",
-            "SOL/USDT",
-            "BNB/USDT",
-            "XRP/USDT",
-            "ADA/USDT",
-            "AVAX/USDT",
-            "DOGE/USDT",
-            "DOT/USDT",
-            "LINK/USDT"
+            "SOL/USDT"
         ],
         "pair_blacklist": []
     },
@@ -92,5 +85,5 @@
     "internals": {
         "process_throttle_secs": 5
     },
-    "user_data_dir": "freqtrade/user_data"
+    "user_data_dir": "/home/rredmer/Dev/crypto-investor/freqtrade/user_data"
 }

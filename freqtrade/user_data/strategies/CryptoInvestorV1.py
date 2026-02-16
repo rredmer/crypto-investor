@@ -292,7 +292,16 @@ class CryptoInvestorV1(IStrategy):
         side: str,
         **kwargs,
     ) -> bool:
-        """Gate trades through the backend risk API (fail-safe: reject)."""
+        """Gate trades through the backend risk API (fail-safe: reject).
+
+        In backtesting/hyperopt mode, skip the API call since the backend
+        may not be running and risk checks are not meaningful for historical sims.
+        """
+        from freqtrade.enums import RunMode
+
+        if self.dp and self.dp.runmode in (RunMode.BACKTEST, RunMode.HYPEROPT):
+            return True
+
         try:
             import requests
 
