@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, String, func
+from sqlalchemy import JSON, Boolean, Float, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -37,3 +37,37 @@ class RiskLimitsConfig(Base):
     max_correlation: Mapped[float] = mapped_column(default=0.70)
     min_risk_reward: Mapped[float] = mapped_column(default=1.5)
     max_leverage: Mapped[float] = mapped_column(default=1.0)
+
+
+class RiskMetricHistory(Base):
+    __tablename__ = "risk_metric_history"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    portfolio_id: Mapped[int] = mapped_column(index=True)
+    var_95: Mapped[float] = mapped_column(default=0.0)
+    var_99: Mapped[float] = mapped_column(default=0.0)
+    cvar_95: Mapped[float] = mapped_column(default=0.0)
+    cvar_99: Mapped[float] = mapped_column(default=0.0)
+    method: Mapped[str] = mapped_column(String(20), default="parametric")
+    drawdown: Mapped[float] = mapped_column(default=0.0)
+    equity: Mapped[float] = mapped_column(default=0.0)
+    open_positions_count: Mapped[int] = mapped_column(default=0)
+    recorded_at: Mapped[datetime] = mapped_column(server_default=func.now(), index=True)
+
+
+class TradeCheckLog(Base):
+    __tablename__ = "trade_check_log"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    portfolio_id: Mapped[int] = mapped_column(index=True)
+    symbol: Mapped[str] = mapped_column(String(20))
+    side: Mapped[str] = mapped_column(String(10))
+    size: Mapped[float] = mapped_column()
+    entry_price: Mapped[float] = mapped_column()
+    stop_loss_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    approved: Mapped[bool] = mapped_column()
+    reason: Mapped[str] = mapped_column(String(500))
+    equity_at_check: Mapped[float] = mapped_column(default=0.0)
+    drawdown_at_check: Mapped[float] = mapped_column(default=0.0)
+    open_positions_at_check: Mapped[int] = mapped_column(default=0)
+    checked_at: Mapped[datetime] = mapped_column(server_default=func.now(), index=True)

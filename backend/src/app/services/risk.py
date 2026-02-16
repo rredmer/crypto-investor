@@ -3,11 +3,12 @@ Risk management service — wraps common.risk.risk_manager with DB persistence.
 """
 
 import logging
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.risk import RiskLimitsConfig, RiskState
+from app.models.risk import RiskLimitsConfig, RiskMetricHistory, RiskState, TradeCheckLog
 from app.services.platform_bridge import ensure_platform_imports
 
 logger = logging.getLogger("risk_service")
@@ -125,7 +126,28 @@ class RiskManagementService:
         state = await self._get_or_create_state(portfolio_id)
         limits_config = await self._get_or_create_limits(portfolio_id)
         rm = self._build_risk_manager(limits_config, state)
-        return rm.check_new_trade(symbol, side, size, entry_price, stop_loss_price)
+        approved, reason = rm.check_new_trade(symbol, side, size, entry_price, stop_loss_price)
+
+        # Log the trade check decision
+        peak = state.peak_equity if state.peak_equity > 0 else 1
+        drawdown = 1.0 - (state.total_equity / peak)
+        log_entry = TradeCheckLog(
+            portfolio_id=portfolio_id,
+            symbol=symbol,
+            side=side,
+            size=size,
+            entry_price=entry_price,
+            stop_loss_price=stop_loss_price,
+            approved=approved,
+            reason=reason,
+            equity_at_check=state.total_equity,
+            drawdown_at_check=round(drawdown, 4),
+            open_positions_at_check=len(state.open_positions or {}),
+        )
+        self._session.add(log_entry)
+        await self._session.flush()
+
+        return approved, reason
 
     async def calculate_position_size(
         self,
@@ -174,3 +196,50 @@ class RiskManagementService:
         limits_config = await self._get_or_create_limits(portfolio_id)
         rm = self._build_risk_manager(limits_config, state)
         return rm.portfolio_heat_check()
+
+    async def record_metrics(self, portfolio_id: int, method: str = "parametric") -> RiskMetricHistory:
+        """Snapshot current VaR metrics into the history table."""
+        state = await self._get_or_create_state(portfolio_id)
+        limits_config = await self._get_or_create_limits(portfolio_id)
+        rm = self._build_risk_manager(limits_config, state)
+        var_result = rm.get_var(method)
+        peak = state.peak_equity if state.peak_equity > 0 else 1
+        drawdown = 1.0 - (state.total_equity / peak)
+
+        entry = RiskMetricHistory(
+            portfolio_id=portfolio_id,
+            var_95=var_result.var_95,
+            var_99=var_result.var_99,
+            cvar_95=var_result.cvar_95,
+            cvar_99=var_result.cvar_99,
+            method=var_result.method,
+            drawdown=round(drawdown, 4),
+            equity=state.total_equity,
+            open_positions_count=len(state.open_positions or {}),
+        )
+        self._session.add(entry)
+        await self._session.flush()
+        return entry
+
+    async def get_metric_history(self, portfolio_id: int, hours: int = 168) -> list[RiskMetricHistory]:
+        """Return metric history snapshots for the last N hours."""
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+        result = await self._session.execute(
+            select(RiskMetricHistory)
+            .where(
+                RiskMetricHistory.portfolio_id == portfolio_id,
+                RiskMetricHistory.recorded_at >= cutoff,
+            )
+            .order_by(RiskMetricHistory.recorded_at.desc())
+        )
+        return list(result.scalars().all())
+
+    async def get_trade_log(self, portfolio_id: int, limit: int = 50) -> list[TradeCheckLog]:
+        """Return recent trade check log entries."""
+        result = await self._session.execute(
+            select(TradeCheckLog)
+            .where(TradeCheckLog.portfolio_id == portfolio_id)
+            .order_by(TradeCheckLog.checked_at.desc())
+            .limit(limit)
+        )
+        return list(result.scalars().all())

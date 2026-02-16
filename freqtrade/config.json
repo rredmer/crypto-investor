@@ -31,7 +31,7 @@
         "order_book_top": 1
     },
     "exchange": {
-        "name": "binance",
+        "name": "kraken",
         "key": "",
         "secret": "",
         "ccxt_config": {},
@@ -49,9 +49,7 @@
             "DOT/USDT",
             "LINK/USDT"
         ],
-        "pair_blacklist": [
-            "BNB/.*"
-        ]
+        "pair_blacklist": []
     },
     "pairlists": [
         {

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { riskApi } from "../api/risk";
-import type { RiskLimits, RiskStatus, VaRData, HeatCheckData } from "../types";
+import type { RiskLimits, RiskStatus, VaRData, HeatCheckData, RiskMetricHistoryEntry, TradeCheckLogEntry } from "../types";
 
 export function RiskManagement() {
   const queryClient = useQueryClient();
@@ -29,6 +29,19 @@ export function RiskManagement() {
     queryKey: ["risk-heat-check", portfolioId],
     queryFn: () => riskApi.getHeatCheck(portfolioId),
     refetchInterval: 30000,
+  });
+
+  // Metric history query
+  const [historyHours, setHistoryHours] = useState(168);
+  const { data: metricHistory } = useQuery<RiskMetricHistoryEntry[]>({
+    queryKey: ["risk-metric-history", portfolioId, historyHours],
+    queryFn: () => riskApi.getMetricHistory(portfolioId, historyHours),
+  });
+
+  // Trade log query
+  const { data: tradeLog } = useQuery<TradeCheckLogEntry[]>({
+    queryKey: ["risk-trade-log", portfolioId],
+    queryFn: () => riskApi.getTradeLog(portfolioId, 50),
   });
 
   // Limits editor state
@@ -75,7 +88,10 @@ export function RiskManagement() {
         size: tradeSize,
         entry_price: tradeEntry,
       }),
-    onSuccess: (data) => setTradeResult(data),
+    onSuccess: (data) => {
+      setTradeResult(data);
+      queryClient.invalidateQueries({ queryKey: ["risk-trade-log", portfolioId] });
+    },
   });
 
   const resetMutation = useMutation({
@@ -148,12 +164,17 @@ export function RiskManagement() {
         </div>
       </div>
 
-      {/* Status Cards */}
-      <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
+      {/* Status Cards — 5 columns with Total PnL */}
+      <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-5">
         <StatusCard label="Equity" value={`$${(status?.equity ?? 0).toLocaleString()}`} />
         <StatusCard label="Drawdown" value={`${drawdownPct}%`} className={drawdownColor} />
         <StatusCard label="Daily PnL" value={`$${(status?.daily_pnl ?? 0).toFixed(2)}`}
           className={status && status.daily_pnl >= 0 ? "text-green-400" : "text-red-400"} />
+        <StatusCard
+          label="Total PnL"
+          value={`$${(status?.total_pnl ?? 0).toFixed(2)}`}
+          className={status && status.total_pnl >= 0 ? "text-green-400" : "text-red-400"}
+        />
         <StatusCard
           label="Status"
           value={status?.is_halted ? "HALTED" : "Active"}
@@ -470,6 +491,116 @@ export function RiskManagement() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* VaR History */}
+      <div className="mt-6 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-lg font-semibold">VaR History</h3>
+          <select
+            value={historyHours}
+            onChange={(e) => setHistoryHours(Number(e.target.value))}
+            className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1 text-xs"
+          >
+            <option value={24}>24h</option>
+            <option value={168}>7d</option>
+            <option value={720}>30d</option>
+          </select>
+        </div>
+        {metricHistory && metricHistory.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-[var(--color-border)] text-[var(--color-text-muted)]">
+                  <th className="pb-2 text-left">Time</th>
+                  <th className="pb-2 text-right">VaR 95%</th>
+                  <th className="pb-2 text-right">VaR 99%</th>
+                  <th className="pb-2 text-right">CVaR 95%</th>
+                  <th className="pb-2 text-right">CVaR 99%</th>
+                  <th className="pb-2 text-right">Equity</th>
+                  <th className="pb-2 text-right">Drawdown</th>
+                  <th className="pb-2 text-right">Positions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {metricHistory.map((entry) => (
+                  <tr key={entry.id} className="border-b border-[var(--color-border)]/30">
+                    <td className="py-1.5 text-[var(--color-text-muted)]">
+                      {new Date(entry.recorded_at).toLocaleString()}
+                    </td>
+                    <td className="py-1.5 text-right font-mono">${entry.var_95.toFixed(2)}</td>
+                    <td className="py-1.5 text-right font-mono">${entry.var_99.toFixed(2)}</td>
+                    <td className="py-1.5 text-right font-mono">${entry.cvar_95.toFixed(2)}</td>
+                    <td className="py-1.5 text-right font-mono">${entry.cvar_99.toFixed(2)}</td>
+                    <td className="py-1.5 text-right font-mono">${entry.equity.toLocaleString()}</td>
+                    <td className="py-1.5 text-right font-mono">{(entry.drawdown * 100).toFixed(2)}%</td>
+                    <td className="py-1.5 text-right font-mono">{entry.open_positions_count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-sm text-[var(--color-text-muted)]">
+            No metric history yet. Snapshots are recorded via the record-metrics endpoint.
+          </p>
+        )}
+      </div>
+
+      {/* Trade Audit Log */}
+      <div className="mt-6 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+        <h3 className="mb-4 text-lg font-semibold">Trade Audit Log</h3>
+        {tradeLog && tradeLog.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-[var(--color-border)] text-[var(--color-text-muted)]">
+                  <th className="pb-2 text-left">Time</th>
+                  <th className="pb-2 text-left">Symbol</th>
+                  <th className="pb-2 text-left">Side</th>
+                  <th className="pb-2 text-right">Size</th>
+                  <th className="pb-2 text-right">Price</th>
+                  <th className="pb-2 text-center">Result</th>
+                  <th className="pb-2 text-left">Reason</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tradeLog.map((entry) => (
+                  <tr
+                    key={entry.id}
+                    className={`border-b border-[var(--color-border)]/30 ${
+                      entry.approved ? "bg-green-500/5" : "bg-red-500/5"
+                    }`}
+                  >
+                    <td className="py-1.5 text-[var(--color-text-muted)]">
+                      {new Date(entry.checked_at).toLocaleString()}
+                    </td>
+                    <td className="py-1.5 font-mono">{entry.symbol}</td>
+                    <td className={`py-1.5 font-medium ${entry.side === "buy" ? "text-green-400" : "text-red-400"}`}>
+                      {entry.side.toUpperCase()}
+                    </td>
+                    <td className="py-1.5 text-right font-mono">{entry.size}</td>
+                    <td className="py-1.5 text-right font-mono">${entry.entry_price.toLocaleString()}</td>
+                    <td className="py-1.5 text-center">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                          entry.approved ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"
+                        }`}
+                      >
+                        {entry.approved ? "Approved" : "Rejected"}
+                      </span>
+                    </td>
+                    <td className="py-1.5 text-[var(--color-text-muted)]">{entry.reason}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-sm text-[var(--color-text-muted)]">
+            No trade checks recorded yet. Use the Trade Checker above to validate trades.
+          </p>
+        )}
       </div>
     </div>
   );

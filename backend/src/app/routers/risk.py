@@ -8,7 +8,9 @@ from app.schemas.risk import (
     PositionSizeResponse,
     RiskLimitsRead,
     RiskLimitsUpdate,
+    RiskMetricHistoryRead,
     RiskStatusRead,
+    TradeCheckLogRead,
     TradeCheckRequest,
     TradeCheckResponse,
     VaRResponse,
@@ -82,3 +84,24 @@ async def get_var(
 @router.get("/{portfolio_id}/heat-check", response_model=HeatCheckResponse)
 async def get_heat_check(portfolio_id: int, session: SessionDep) -> dict:
     return await _get_service(session).get_heat_check(portfolio_id)
+
+
+@router.get("/{portfolio_id}/metric-history", response_model=list[RiskMetricHistoryRead])
+async def get_metric_history(
+    portfolio_id: int, session: SessionDep, hours: int = 168
+) -> list:
+    return await _get_service(session).get_metric_history(portfolio_id, hours)
+
+
+@router.post("/{portfolio_id}/record-metrics", response_model=RiskMetricHistoryRead)
+async def record_metrics(
+    portfolio_id: int, session: SessionDep, method: str = "parametric"
+) -> object:
+    return await _get_service(session).record_metrics(portfolio_id, method)
+
+
+@router.get("/{portfolio_id}/trade-log", response_model=list[TradeCheckLogRead])
+async def get_trade_log(
+    portfolio_id: int, session: SessionDep, limit: int = 50
+) -> list:
+    return await _get_service(session).get_trade_log(portfolio_id, limit)

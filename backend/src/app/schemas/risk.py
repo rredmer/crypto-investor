@@ -90,3 +90,37 @@ class HeatCheckResponse(BaseModel):
     cvar_95: float
     cvar_99: float
     is_halted: bool
+
+
+class RiskMetricHistoryRead(BaseModel):
+    id: int
+    portfolio_id: int
+    var_95: float
+    var_99: float
+    cvar_95: float
+    cvar_99: float
+    method: str
+    drawdown: float
+    equity: float
+    open_positions_count: int
+    recorded_at: str
+
+    model_config = {"from_attributes": True}
+
+
+class TradeCheckLogRead(BaseModel):
+    id: int
+    portfolio_id: int
+    symbol: str
+    side: str
+    size: float
+    entry_price: float
+    stop_loss_price: float | None
+    approved: bool
+    reason: str
+    equity_at_check: float
+    drawdown_at_check: float
+    open_positions_at_check: int
+    checked_at: str
+
+    model_config = {"from_attributes": True}

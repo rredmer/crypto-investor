@@ -149,6 +149,36 @@ export interface HeatCheckData {
   is_halted: boolean;
 }
 
+export interface RiskMetricHistoryEntry {
+  id: number;
+  portfolio_id: number;
+  var_95: number;
+  var_99: number;
+  cvar_95: number;
+  cvar_99: number;
+  method: string;
+  drawdown: number;
+  equity: number;
+  open_positions_count: number;
+  recorded_at: string;
+}
+
+export interface TradeCheckLogEntry {
+  id: number;
+  portfolio_id: number;
+  symbol: string;
+  side: string;
+  size: number;
+  entry_price: number;
+  stop_loss_price: number | null;
+  approved: boolean;
+  reason: string;
+  equity_at_check: number;
+  drawdown_at_check: number;
+  open_positions_at_check: number;
+  checked_at: string;
+}
+
 // Backtest types
 export interface BacktestResult {
   id: number;

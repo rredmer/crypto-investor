@@ -57,17 +57,72 @@ const mockHeatCheckUnhealthy = {
   issues: ["Drawdown warning: 12% approaching limit 15%", "VaR warning: 99% VaR $1200 > 10% of equity"],
 };
 
+const mockMetricHistory = [
+  {
+    id: 1,
+    portfolio_id: 1,
+    var_95: 250.50,
+    var_99: 420.75,
+    cvar_95: 310.20,
+    cvar_99: 530.40,
+    method: "parametric",
+    drawdown: 0.02,
+    equity: 10000,
+    open_positions_count: 2,
+    recorded_at: "2026-02-15T12:00:00Z",
+  },
+];
+
+const mockTradeLog = [
+  {
+    id: 1,
+    portfolio_id: 1,
+    symbol: "BTC/USDT",
+    side: "buy",
+    size: 0.1,
+    entry_price: 50000,
+    stop_loss_price: 48000,
+    approved: true,
+    reason: "approved",
+    equity_at_check: 10000,
+    drawdown_at_check: 0.02,
+    open_positions_at_check: 0,
+    checked_at: "2026-02-15T11:00:00Z",
+  },
+  {
+    id: 2,
+    portfolio_id: 1,
+    symbol: "ETH/USDT",
+    side: "buy",
+    size: 5.0,
+    entry_price: 3000,
+    stop_loss_price: null,
+    approved: false,
+    reason: "Position too large: 150.00% > 20.00%",
+    equity_at_check: 10000,
+    drawdown_at_check: 0.02,
+    open_positions_at_check: 1,
+    checked_at: "2026-02-15T11:30:00Z",
+  },
+];
+
+function setupAllMocks() {
+  vi.stubGlobal(
+    "fetch",
+    mockFetch({
+      "/api/risk/1/status": mockStatus,
+      "/api/risk/1/limits": mockLimits,
+      "/api/risk/1/var": mockVaR,
+      "/api/risk/1/heat-check": mockHeatCheckHealthy,
+      "/api/risk/1/metric-history": mockMetricHistory,
+      "/api/risk/1/trade-log": mockTradeLog,
+    }),
+  );
+}
+
 describe("RiskManagement - VaR Summary", () => {
   beforeEach(() => {
-    vi.stubGlobal(
-      "fetch",
-      mockFetch({
-        "/api/risk/1/status": mockStatus,
-        "/api/risk/1/limits": mockLimits,
-        "/api/risk/1/var": mockVaR,
-        "/api/risk/1/heat-check": mockHeatCheckHealthy,
-      }),
-    );
+    setupAllMocks();
   });
 
   it("renders the page heading", () => {
@@ -78,24 +133,21 @@ describe("RiskManagement - VaR Summary", () => {
   it("renders VaR summary card", async () => {
     renderWithProviders(<RiskManagement />);
     expect(await screen.findByText("Value at Risk")).toBeInTheDocument();
-    expect(await screen.findByText("VaR 95%")).toBeInTheDocument();
-    expect(await screen.findByText("VaR 99%")).toBeInTheDocument();
-    expect(await screen.findByText("CVaR 95%")).toBeInTheDocument();
-    expect(await screen.findByText("CVaR 99%")).toBeInTheDocument();
+    // VaR labels appear in both summary card and history table
+    const var95 = await screen.findAllByText("VaR 95%");
+    expect(var95.length).toBeGreaterThanOrEqual(1);
+    const var99 = await screen.findAllByText("VaR 99%");
+    expect(var99.length).toBeGreaterThanOrEqual(1);
+    const cvar95 = await screen.findAllByText("CVaR 95%");
+    expect(cvar95.length).toBeGreaterThanOrEqual(1);
+    const cvar99 = await screen.findAllByText("CVaR 99%");
+    expect(cvar99.length).toBeGreaterThanOrEqual(1);
   });
 });
 
 describe("RiskManagement - Portfolio Health", () => {
   it("renders healthy badge when portfolio is healthy", async () => {
-    vi.stubGlobal(
-      "fetch",
-      mockFetch({
-        "/api/risk/1/status": mockStatus,
-        "/api/risk/1/limits": mockLimits,
-        "/api/risk/1/var": mockVaR,
-        "/api/risk/1/heat-check": mockHeatCheckHealthy,
-      }),
-    );
+    setupAllMocks();
     renderWithProviders(<RiskManagement />);
     expect(await screen.findByText("Healthy")).toBeInTheDocument();
   });
@@ -108,6 +160,8 @@ describe("RiskManagement - Portfolio Health", () => {
         "/api/risk/1/limits": mockLimits,
         "/api/risk/1/var": mockVaR,
         "/api/risk/1/heat-check": mockHeatCheckUnhealthy,
+        "/api/risk/1/metric-history": [],
+        "/api/risk/1/trade-log": [],
       }),
     );
     renderWithProviders(<RiskManagement />);
@@ -117,15 +171,7 @@ describe("RiskManagement - Portfolio Health", () => {
 
 describe("RiskManagement - Limits Editor", () => {
   beforeEach(() => {
-    vi.stubGlobal(
-      "fetch",
-      mockFetch({
-        "/api/risk/1/status": mockStatus,
-        "/api/risk/1/limits": mockLimits,
-        "/api/risk/1/var": mockVaR,
-        "/api/risk/1/heat-check": mockHeatCheckHealthy,
-      }),
-    );
+    setupAllMocks();
   });
 
   it("shows Edit button in read-only mode", async () => {
@@ -139,5 +185,47 @@ describe("RiskManagement - Limits Editor", () => {
     fireEvent.click(editBtn);
     expect(screen.getByText("Save")).toBeInTheDocument();
     expect(screen.getByText("Cancel")).toBeInTheDocument();
+  });
+});
+
+describe("RiskManagement - Total PnL Card", () => {
+  beforeEach(() => {
+    setupAllMocks();
+  });
+
+  it("renders Total PnL status card", async () => {
+    renderWithProviders(<RiskManagement />);
+    expect(await screen.findByText("Total PnL")).toBeInTheDocument();
+    expect(await screen.findByText("$500.00")).toBeInTheDocument();
+  });
+});
+
+describe("RiskManagement - VaR History", () => {
+  beforeEach(() => {
+    setupAllMocks();
+  });
+
+  it("renders VaR History section heading", async () => {
+    renderWithProviders(<RiskManagement />);
+    expect(await screen.findByText("VaR History")).toBeInTheDocument();
+  });
+});
+
+describe("RiskManagement - Trade Audit Log", () => {
+  beforeEach(() => {
+    setupAllMocks();
+  });
+
+  it("renders Trade Audit Log section heading", async () => {
+    renderWithProviders(<RiskManagement />);
+    expect(await screen.findByText("Trade Audit Log")).toBeInTheDocument();
+  });
+
+  it("renders approved and rejected badges", async () => {
+    renderWithProviders(<RiskManagement />);
+    const approved = await screen.findAllByText("Approved");
+    expect(approved.length).toBeGreaterThanOrEqual(1);
+    const rejected = await screen.findAllByText("Rejected");
+    expect(rejected.length).toBeGreaterThanOrEqual(1);
   });
 });

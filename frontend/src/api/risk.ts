@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { RiskStatus, RiskLimits, VaRData, HeatCheckData } from "../types";
+import type { RiskStatus, RiskLimits, VaRData, HeatCheckData, RiskMetricHistoryEntry, TradeCheckLogEntry } from "../types";
 
 export const riskApi = {
   getStatus: (portfolioId: number) =>
@@ -46,4 +46,10 @@ export const riskApi = {
 
   getHeatCheck: (portfolioId: number) =>
     api.get<HeatCheckData>(`/risk/${portfolioId}/heat-check`),
+
+  getMetricHistory: (portfolioId: number, hours: number = 168) =>
+    api.get<RiskMetricHistoryEntry[]>(`/risk/${portfolioId}/metric-history?hours=${hours}`),
+
+  getTradeLog: (portfolioId: number, limit: number = 50) =>
+    api.get<TradeCheckLogEntry[]>(`/risk/${portfolioId}/trade-log?limit=${limit}`),
 };
