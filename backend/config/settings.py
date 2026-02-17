@@ -18,10 +18,14 @@ load_dotenv(BASE_DIR / ".env")
 
 # ── Core ──────────────────────────────────────────────────────
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "insecure-dev-key-change-me")
-DEBUG = os.environ.get("DJANGO_DEBUG", "true").lower() in ("true", "1", "yes")
+DEBUG = os.environ.get("DJANGO_DEBUG", "false").lower() in ("true", "1", "yes")
+
+ENCRYPTION_KEY = os.environ.get("DJANGO_ENCRYPTION_KEY", "")
 
 if not DEBUG and SECRET_KEY == "insecure-dev-key-change-me":
     raise ValueError("DJANGO_SECRET_KEY must be set in production")
+if not DEBUG and not ENCRYPTION_KEY:
+    raise ValueError("DJANGO_ENCRYPTION_KEY must be set in production")
 
 ALLOWED_HOSTS = [
     h.strip()
@@ -89,9 +93,16 @@ DATABASES = {
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # ── Auth ──────────────────────────────────────────────────────
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
+]
+
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+     "OPTIONS": {"min_length": 12}},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
@@ -102,10 +113,12 @@ SESSION_COOKIE_AGE = 3600  # 1 hour
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_NAME = "__ci_sid"
 SESSION_SAVE_EVERY_REQUEST = True
 
 # ── CSRF ──────────────────────────────────────────────────────
 CSRF_COOKIE_HTTPONLY = False  # Frontend reads csrftoken cookie
+CSRF_FAILURE_VIEW = "core.views.csrf_failure"
 CSRF_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SAMESITE = "Lax"
 CSRF_TRUSTED_ORIGINS = [
@@ -116,6 +129,7 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 
 # ── Security headers ─────────────────────────────────────────
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
@@ -190,6 +204,9 @@ RATE_LIMIT_GENERAL = 60  # requests per minute
 RATE_LIMIT_LOGIN = 5  # login attempts per minute
 
 # ── Logging ───────────────────────────────────────────────────
+LOG_DIR = BASE_DIR / "data" / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -204,6 +221,13 @@ LOGGING = {
             "class": "logging.StreamHandler",
             "formatter": "verbose",
         },
+        "security_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": str(LOG_DIR / "security.log"),
+            "maxBytes": 10 * 1024 * 1024,  # 10 MB
+            "backupCount": 10,
+            "formatter": "verbose",
+        },
     },
     "root": {
         "handlers": ["console"],
@@ -212,5 +236,7 @@ LOGGING = {
     "loggers": {
         "django": {"handlers": ["console"], "level": "WARNING"},
         "django.request": {"handlers": ["console"], "level": "WARNING"},
+        "security": {"handlers": ["console", "security_file"], "level": "INFO", "propagate": False},
+        "auth": {"handlers": ["console", "security_file"], "level": "INFO", "propagate": False},
     },
 }

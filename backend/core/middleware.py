@@ -33,10 +33,12 @@ class RateLimitMiddleware:
 
         if not self._allow(ip, limit):
             logger.warning(f"Rate limit exceeded: ip={ip} path={path}")
-            return JsonResponse(
+            response = JsonResponse(
                 {"error": "Rate limit exceeded. Try again later."},
                 status=429,
             )
+            response["Retry-After"] = "60"
+            return response
 
         return self.get_response(request)
 

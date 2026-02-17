@@ -75,10 +75,12 @@ class LoginView(APIView):
 
         if _is_locked_out(ip):
             logger.warning(f"Login blocked (lockout): ip={ip}")
-            return Response(
+            response = Response(
                 {"error": "Account locked due to too many failed attempts. Try again later."},
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
+            response["Retry-After"] = str(settings.LOGIN_LOCKOUT_DURATION)
+            return response
 
         ser = LoginSerializer(data=request.data)
         ser.is_valid(raise_exception=True)

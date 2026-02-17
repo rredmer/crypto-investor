@@ -21,8 +21,13 @@ setup-backend:
 	$(PIP) install -e "$(BACKEND_DIR)[dev]" --quiet
 	@mkdir -p $(BACKEND_DIR)/data
 	$(MANAGE) migrate --run-syncdb
-	@echo "→ Creating superuser (if needed)..."
-	@$(MANAGE) shell -c "from django.contrib.auth.models import User; User.objects.filter(username='admin').exists() or User.objects.create_superuser('admin', '', 'admin')" 2>/dev/null || true
+	@echo "→ Creating superuser (if needed) and ensuring Argon2 hash..."
+	@$(MANAGE) shell -c "\
+from django.contrib.auth.models import User;\
+u, created = User.objects.get_or_create(username='admin', defaults={'is_superuser': True, 'is_staff': True});\
+if created: u.set_password('admin'); u.save(); print('Created admin user')\
+elif not u.password.startswith('argon2'): u.set_password('admin'); u.save(); print('Re-hashed admin password with Argon2')\
+else: print('Admin user OK')" 2>/dev/null || true
 
 setup-frontend:
 	@echo "→ Setting up frontend..."
@@ -85,7 +90,12 @@ harden:
 	@echo "→ Hardening file permissions..."
 	@test -f .env && chmod 600 .env || true
 	@chmod 700 $(BACKEND_DIR)/data
+	@mkdir -p $(BACKEND_DIR)/data/logs && chmod 700 $(BACKEND_DIR)/data/logs
 	@test -d $(BACKEND_DIR)/certs && chmod 700 $(BACKEND_DIR)/certs || true
+	@echo "→ Checking required env vars..."
+	@test -f .env && grep -q '^DJANGO_SECRET_KEY=' .env && echo "  DJANGO_SECRET_KEY ✓" || echo "  WARNING: DJANGO_SECRET_KEY not set"
+	@test -f .env && grep -q '^DJANGO_ENCRYPTION_KEY=' .env && echo "  DJANGO_ENCRYPTION_KEY ✓" || echo "  WARNING: DJANGO_ENCRYPTION_KEY not set"
+	@test -f .env && grep -q '^BACKUP_ENCRYPTION_KEY=' .env && echo "  BACKUP_ENCRYPTION_KEY ✓" || echo "  WARNING: BACKUP_ENCRYPTION_KEY not set"
 	@echo "✓ Permissions hardened"
 
 audit:

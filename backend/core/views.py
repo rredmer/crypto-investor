@@ -1,13 +1,22 @@
-"""Core views — health, platform status, platform config."""
+"""Core views — health, platform status, platform config, CSRF failure."""
 
 import logging
 
+from django.http import JsonResponse
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 logger = logging.getLogger(__name__)
+
+
+def csrf_failure(request, reason="") -> JsonResponse:
+    """Return JSON 403 instead of Django's default HTML CSRF error page."""
+    return JsonResponse(
+        {"error": "CSRF verification failed.", "detail": reason},
+        status=403,
+    )
 
 
 class HealthView(APIView):
