@@ -1,6 +1,11 @@
 from django.urls import path
 
 from market.views import (
+    DataSourceConfigDetailView,
+    DataSourceConfigListView,
+    ExchangeConfigDetailView,
+    ExchangeConfigListView,
+    ExchangeConfigTestView,
     ExchangeListView,
     IndicatorComputeView,
     IndicatorListView,
@@ -16,6 +21,22 @@ from market.views import (
 )
 
 urlpatterns = [
+    # Exchange config CRUD
+    path("exchange-configs/", ExchangeConfigListView.as_view(), name="exchange-config-list"),
+    path(
+        "exchange-configs/<int:pk>/",
+        ExchangeConfigDetailView.as_view(),
+        name="exchange-config-detail",
+    ),
+    path(
+        "exchange-configs/<int:pk>/test/",
+        ExchangeConfigTestView.as_view(),
+        name="exchange-config-test",
+    ),
+    # Data source config CRUD
+    path("data-sources/", DataSourceConfigListView.as_view(), name="data-source-list"),
+    path("data-sources/<int:pk>/", DataSourceConfigDetailView.as_view(), name="data-source-detail"),
+    # Existing routes
     path("exchanges/", ExchangeListView.as_view(), name="exchange-list"),
     path("market/ticker/<path:symbol>/", TickerView.as_view(), name="market-ticker"),
     path("market/tickers/", TickerListView.as_view(), name="market-tickers"),

@@ -1,5 +1,10 @@
 import pytest
+from django.conf import settings
 from rest_framework.test import APIClient
+
+# Ensure a test encryption key is always available
+if not settings.ENCRYPTION_KEY:
+    settings.ENCRYPTION_KEY = "TepMz4I9BrtjZvZ7sH6fVVB2iuW568_UVGBFg189xls="
 
 
 @pytest.fixture

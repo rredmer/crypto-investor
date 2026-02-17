@@ -332,6 +332,65 @@ export interface PaperTradingLogEntry {
   [key: string]: unknown;
 }
 
+// Exchange Config types
+export interface ExchangeConfig {
+  id: number;
+  name: string;
+  exchange_id: string;
+  api_key_masked: string;
+  has_api_key: boolean;
+  has_api_secret: boolean;
+  has_passphrase: boolean;
+  is_sandbox: boolean;
+  is_default: boolean;
+  is_active: boolean;
+  last_tested_at: string | null;
+  last_test_success: boolean | null;
+  last_test_error: string;
+  options: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExchangeConfigCreate {
+  name: string;
+  exchange_id: string;
+  api_key?: string;
+  api_secret?: string;
+  passphrase?: string;
+  is_sandbox: boolean;
+  is_default: boolean;
+  is_active?: boolean;
+  options?: Record<string, unknown>;
+}
+
+export interface ExchangeTestResult {
+  success: boolean;
+  markets_count?: number;
+  message: string;
+}
+
+export interface DataSourceConfig {
+  id: number;
+  exchange_config: number;
+  exchange_name: string;
+  symbols: string[];
+  timeframes: string[];
+  is_active: boolean;
+  fetch_interval_minutes: number;
+  last_fetched_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DataSourceConfigCreate {
+  exchange_config: number;
+  symbols: string[];
+  timeframes: string[];
+  is_active?: boolean;
+  fetch_interval_minutes?: number;
+}
+
 // Platform types
 export interface FrameworkStatus {
   name: string;

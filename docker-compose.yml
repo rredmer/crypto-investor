@@ -1,41 +1,37 @@
 services:
   backend:
     build:
-      context: .
-      dockerfile: backend/Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile
     ports:
-      - "127.0.0.1:8000:8000"
-    volumes:
-      - ./backend/data:/app/backend/data
-      - ./data:/app/data
-    env_file:
-      - .env
+      - "8000:8000"
     environment:
-      - PYTHONPATH=/app
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    deploy:
-      resources:
-        limits:
-          memory: 2G
+      DJANGO_SECRET_KEY: docker-dev-secret-key-not-for-production
+      DJANGO_DEBUG: "true"
+      DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1,0.0.0.0,backend"
+      DJANGO_ENCRYPTION_KEY: "${DJANGO_ENCRYPTION_KEY:-TepMz4I9BrtjZvZ7sH6fVVB2iuW568_UVGBFg189xls=}"
+      CORS_ALLOWED_ORIGINS: "http://localhost:3000,http://localhost:5173"
+      CSRF_TRUSTED_ORIGINS: "http://localhost:3000,http://localhost:5173,http://localhost:8000"
+      EXCHANGE_ID: "${EXCHANGE_ID:-binance}"
+      EXCHANGE_API_KEY: "${EXCHANGE_API_KEY:-}"
+      EXCHANGE_API_SECRET: "${EXCHANGE_API_SECRET:-}"
+    volumes:
+      - backend-data:/app/data
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health/')"]
-      interval: 30s
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health/"]
+      interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 5
 
   frontend:
     build:
       context: ./frontend
+      dockerfile: Dockerfile
     ports:
-      - "127.0.0.1:5173:80"
+      - "3000:80"
     depends_on:
       backend:
         condition: service_healthy
-    security_opt:
-      - no-new-privileges:true
-    deploy:
-      resources:
-        limits:
-          memory: 256M
+
+volumes:
+  backend-data:

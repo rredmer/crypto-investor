@@ -1,5 +1,113 @@
 from rest_framework import serializers
 
+from market.models import DataSourceConfig, ExchangeConfig
+
+# ── Exchange Config serializers ──────────────────────────────
+
+
+def _mask_value(value: str) -> str:
+    """Mask a credential value: show first4****last4, or **** if too short."""
+    if not value:
+        return ""
+    if len(value) <= 8:
+        return "****"
+    return f"{value[:4]}****{value[-4:]}"
+
+
+class ExchangeConfigSerializer(serializers.ModelSerializer):
+    """Read serializer — never exposes raw credentials."""
+
+    api_key_masked = serializers.SerializerMethodField()
+    has_api_key = serializers.SerializerMethodField()
+    has_api_secret = serializers.SerializerMethodField()
+    has_passphrase = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ExchangeConfig
+        exclude = ["api_key", "api_secret", "passphrase"]
+
+    def get_api_key_masked(self, obj) -> str:
+        return _mask_value(obj.api_key)
+
+    def get_has_api_key(self, obj) -> bool:
+        return bool(obj.api_key)
+
+    def get_has_api_secret(self, obj) -> bool:
+        return bool(obj.api_secret)
+
+    def get_has_passphrase(self, obj) -> bool:
+        return bool(obj.passphrase)
+
+
+class ExchangeConfigCreateSerializer(serializers.ModelSerializer):
+    """Write serializer for creating exchange configs."""
+
+    class Meta:
+        model = ExchangeConfig
+        fields = [
+            "name",
+            "exchange_id",
+            "api_key",
+            "api_secret",
+            "passphrase",
+            "is_sandbox",
+            "is_default",
+            "is_active",
+            "options",
+        ]
+
+
+class ExchangeConfigUpdateSerializer(serializers.ModelSerializer):
+    """Write serializer for updating exchange configs — all fields optional."""
+
+    class Meta:
+        model = ExchangeConfig
+        fields = [
+            "name",
+            "exchange_id",
+            "api_key",
+            "api_secret",
+            "passphrase",
+            "is_sandbox",
+            "is_default",
+            "is_active",
+            "options",
+        ]
+        extra_kwargs = {f: {"required": False} for f in fields}
+
+    def update(self, instance, validated_data):
+        # Omitting credential fields preserves existing values
+        for field in ("api_key", "api_secret", "passphrase"):
+            if field not in validated_data:
+                validated_data[field] = getattr(instance, field)
+        return super().update(instance, validated_data)
+
+
+# ── Data Source Config serializers ───────────────────────────
+
+
+class DataSourceConfigSerializer(serializers.ModelSerializer):
+    exchange_name = serializers.CharField(source="exchange_config.name", read_only=True)
+
+    class Meta:
+        model = DataSourceConfig
+        fields = "__all__"
+
+
+class DataSourceConfigCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DataSourceConfig
+        fields = [
+            "exchange_config",
+            "symbols",
+            "timeframes",
+            "is_active",
+            "fetch_interval_minutes",
+        ]
+
+
+# ── Existing market serializers ──────────────────────────────
+
 
 class ExchangeInfoSerializer(serializers.Serializer):
     id = serializers.CharField()

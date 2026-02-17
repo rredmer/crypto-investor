@@ -1,26 +1,61 @@
 """Exchange service — wraps ccxt for async market data access."""
 
+import logging
 from datetime import datetime, timezone
 
 import ccxt.async_support as ccxt
 from django.conf import settings
 
+logger = logging.getLogger(__name__)
+
 SUPPORTED_EXCHANGES = ["binance", "coinbase", "kraken", "kucoin", "bybit"]
 
 
+def _load_db_config(config_id: int | None = None):
+    """Load ExchangeConfig from DB. Returns None if unavailable."""
+    try:
+        from market.models import ExchangeConfig
+
+        if config_id is not None:
+            return ExchangeConfig.objects.get(pk=config_id, is_active=True)
+        return ExchangeConfig.objects.filter(is_default=True, is_active=True).first()
+    except Exception:
+        return None
+
+
 class ExchangeService:
-    def __init__(self, exchange_id: str | None = None) -> None:
-        self._exchange_id = exchange_id or settings.EXCHANGE_ID
+    def __init__(
+        self, exchange_id: str | None = None, config_id: int | None = None
+    ) -> None:
+        self._db_config = _load_db_config(config_id)
+        if self._db_config:
+            self._exchange_id = self._db_config.exchange_id
+        else:
+            self._exchange_id = exchange_id or settings.EXCHANGE_ID
         self._exchange: ccxt.Exchange | None = None
 
     async def _get_exchange(self) -> ccxt.Exchange:
         if self._exchange is None:
             exchange_class = getattr(ccxt, self._exchange_id)
             config: dict[str, object] = {"enableRateLimit": True}
-            if settings.EXCHANGE_API_KEY:
+
+            if self._db_config and self._db_config.api_key:
+                config["apiKey"] = self._db_config.api_key
+                config["secret"] = self._db_config.api_secret
+                if self._db_config.passphrase:
+                    config["password"] = self._db_config.passphrase
+                if self._db_config.is_sandbox:
+                    config["sandbox"] = True
+                if self._db_config.options:
+                    config["options"] = self._db_config.options
+            elif settings.EXCHANGE_API_KEY:
                 config["apiKey"] = settings.EXCHANGE_API_KEY
                 config["secret"] = settings.EXCHANGE_API_SECRET
+
             self._exchange = exchange_class(config)
+
+            if self._db_config and self._db_config.is_sandbox:
+                self._exchange.set_sandbox_mode(True)
         return self._exchange
 
     async def close(self) -> None:

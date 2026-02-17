@@ -1,5 +1,15 @@
 from django.db import models
 
+from market.fields import EncryptedTextField
+
+EXCHANGE_CHOICES = [
+    ("binance", "Binance"),
+    ("coinbase", "Coinbase"),
+    ("kraken", "Kraken"),
+    ("kucoin", "KuCoin"),
+    ("bybit", "Bybit"),
+]
+
 
 class MarketData(models.Model):
     symbol = models.CharField(max_length=20, db_index=True)
@@ -18,3 +28,53 @@ class MarketData(models.Model):
 
     def __str__(self):
         return f"{self.symbol} @ {self.price}"
+
+
+class ExchangeConfig(models.Model):
+    name = models.CharField(max_length=100)
+    exchange_id = models.CharField(max_length=50, choices=EXCHANGE_CHOICES)
+    api_key = EncryptedTextField(blank=True, default="")
+    api_secret = EncryptedTextField(blank=True, default="")
+    passphrase = EncryptedTextField(blank=True, default="")
+    is_sandbox = models.BooleanField(default=True)
+    is_default = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
+    last_tested_at = models.DateTimeField(null=True, blank=True)
+    last_test_success = models.BooleanField(null=True, blank=True)
+    last_test_error = models.CharField(max_length=500, blank=True, default="")
+    options = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-is_default", "-created_at"]
+
+    def __str__(self):
+        return f"{self.name} ({self.exchange_id})"
+
+    def save(self, *args, **kwargs):
+        # Enforce at most one default
+        if self.is_default:
+            ExchangeConfig.objects.filter(is_default=True).exclude(pk=self.pk).update(
+                is_default=False
+            )
+        super().save(*args, **kwargs)
+
+
+class DataSourceConfig(models.Model):
+    exchange_config = models.ForeignKey(
+        ExchangeConfig, on_delete=models.CASCADE, related_name="data_sources"
+    )
+    symbols = models.JSONField(default=list)
+    timeframes = models.JSONField(default=list)
+    is_active = models.BooleanField(default=True)
+    fetch_interval_minutes = models.IntegerField(default=60)
+    last_fetched_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"DataSource({self.exchange_config.name}: {self.symbols})"

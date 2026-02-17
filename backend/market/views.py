@@ -1,12 +1,187 @@
-"""Market views — exchange info, tickers, OHLCV, indicators, regime."""
+"""Market views — exchange info, tickers, OHLCV, indicators, regime, exchange configs."""
 
+import logging
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 
+from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from market.models import DataSourceConfig, ExchangeConfig
+from market.serializers import (
+    DataSourceConfigCreateSerializer,
+    DataSourceConfigSerializer,
+    ExchangeConfigCreateSerializer,
+    ExchangeConfigSerializer,
+    ExchangeConfigUpdateSerializer,
+)
+
+logger = logging.getLogger(__name__)
+
 _thread_pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="indicator")
+
+
+# ── Exchange Config CRUD ─────────────────────────────────────
+
+
+class ExchangeConfigListView(APIView):
+    def get(self, request: Request) -> Response:
+        configs = ExchangeConfig.objects.all()
+        serializer = ExchangeConfigSerializer(configs, many=True)
+        return Response(serializer.data)
+
+    def post(self, request: Request) -> Response:
+        serializer = ExchangeConfigCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        instance = serializer.save()
+        return Response(
+            ExchangeConfigSerializer(instance).data, status=status.HTTP_201_CREATED
+        )
+
+
+class ExchangeConfigDetailView(APIView):
+    def _get_object(self, pk: int) -> ExchangeConfig | None:
+        try:
+            return ExchangeConfig.objects.get(pk=pk)
+        except ExchangeConfig.DoesNotExist:
+            return None
+
+    def get(self, request: Request, pk: int) -> Response:
+        obj = self._get_object(pk)
+        if obj is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        return Response(ExchangeConfigSerializer(obj).data)
+
+    def put(self, request: Request, pk: int) -> Response:
+        obj = self._get_object(pk)
+        if obj is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        serializer = ExchangeConfigUpdateSerializer(obj, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        instance = serializer.save()
+        return Response(ExchangeConfigSerializer(instance).data)
+
+    def delete(self, request: Request, pk: int) -> Response:
+        obj = self._get_object(pk)
+        if obj is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        obj.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ExchangeConfigTestView(APIView):
+    def post(self, request: Request, pk: int) -> Response:
+        import asyncio
+
+        import ccxt.async_support as ccxt
+
+        try:
+            config = ExchangeConfig.objects.get(pk=pk)
+        except ExchangeConfig.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        async def _test_connection():
+            exchange_class = getattr(ccxt, config.exchange_id)
+            ccxt_config: dict[str, object] = {"enableRateLimit": True}
+            if config.api_key:
+                ccxt_config["apiKey"] = config.api_key
+                ccxt_config["secret"] = config.api_secret
+            if config.passphrase:
+                ccxt_config["password"] = config.passphrase
+            if config.is_sandbox:
+                ccxt_config["sandbox"] = True
+            if config.options:
+                ccxt_config["options"] = config.options
+
+            exchange = exchange_class(ccxt_config)
+            try:
+                if config.is_sandbox:
+                    exchange.set_sandbox_mode(True)
+                await exchange.load_markets()
+                return True, len(exchange.markets), ""
+            except Exception as e:
+                return False, 0, str(e)[:500]
+            finally:
+                await exchange.close()
+
+        loop = asyncio.new_event_loop()
+        try:
+            success, markets_count, error_msg = loop.run_until_complete(_test_connection())
+        finally:
+            loop.close()
+
+        now = datetime.now(tz=timezone.utc)
+        ExchangeConfig.objects.filter(pk=pk).update(
+            last_tested_at=now,
+            last_test_success=success,
+            last_test_error=error_msg,
+        )
+
+        if success:
+            return Response({
+                "success": True,
+                "markets_count": markets_count,
+                "message": (
+                    f"Connected to {config.exchange_id}"
+                    f" — {markets_count} markets loaded"
+                ),
+            })
+        return Response(
+            {"success": False, "message": error_msg},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+
+# ── Data Source Config CRUD ──────────────────────────────────
+
+
+class DataSourceConfigListView(APIView):
+    def get(self, request: Request) -> Response:
+        sources = DataSourceConfig.objects.select_related("exchange_config").all()
+        serializer = DataSourceConfigSerializer(sources, many=True)
+        return Response(serializer.data)
+
+    def post(self, request: Request) -> Response:
+        serializer = DataSourceConfigCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        instance = serializer.save()
+        read_serializer = DataSourceConfigSerializer(instance)
+        return Response(read_serializer.data, status=status.HTTP_201_CREATED)
+
+
+class DataSourceConfigDetailView(APIView):
+    def _get_object(self, pk: int):
+        try:
+            return DataSourceConfig.objects.select_related("exchange_config").get(pk=pk)
+        except DataSourceConfig.DoesNotExist:
+            return None
+
+    def get(self, request: Request, pk: int) -> Response:
+        obj = self._get_object(pk)
+        if obj is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        return Response(DataSourceConfigSerializer(obj).data)
+
+    def put(self, request: Request, pk: int) -> Response:
+        obj = self._get_object(pk)
+        if obj is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        serializer = DataSourceConfigCreateSerializer(obj, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        instance = serializer.save()
+        return Response(DataSourceConfigSerializer(instance).data)
+
+    def delete(self, request: Request, pk: int) -> Response:
+        obj = self._get_object(pk)
+        if obj is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        obj.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# ── Existing views ───────────────────────────────────────────
 
 
 class ExchangeListView(APIView):
