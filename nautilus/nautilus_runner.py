@@ -7,10 +7,11 @@ institutional-grade backtesting and execution engine.
 Handles:
     - Converting shared Parquet data into Nautilus bar format
     - Configuring backtest engines with risk controls
-    - Running event-driven backtests
+    - Running event-driven backtests (pandas-based strategy runner)
     - Extracting performance results
 """
 
+import json
 import sys
 import logging
 from pathlib import Path
@@ -79,6 +80,88 @@ def _tf_to_nautilus(timeframe: str) -> str:
     return mapping.get(timeframe, "1-HOUR")
 
 
+def list_nautilus_strategies() -> list[str]:
+    """Return names of all registered NautilusTrader strategies."""
+    from nautilus.strategies import STRATEGY_REGISTRY
+    return list(STRATEGY_REGISTRY.keys())
+
+
+def run_nautilus_backtest(
+    strategy_name: str,
+    symbol: str = "BTC/USDT",
+    timeframe: str = "1h",
+    exchange: str = "binance",
+    initial_balance: float = 10000.0,
+) -> dict:
+    """
+    Run a backtest using one of the registered Nautilus strategies.
+
+    Loads Parquet data, feeds bars to the strategy, collects trades,
+    computes performance metrics, and saves results as JSON.
+    """
+    from nautilus.strategies import STRATEGY_REGISTRY
+    from common.data_pipeline.pipeline import load_ohlcv
+
+    if strategy_name not in STRATEGY_REGISTRY:
+        available = ", ".join(STRATEGY_REGISTRY.keys())
+        return {"error": f"Unknown strategy '{strategy_name}'. Available: {available}"}
+
+    # Load data
+    df = load_ohlcv(symbol, timeframe, exchange)
+    if df.empty:
+        return {"error": f"No data for {symbol} {timeframe} on {exchange}"}
+
+    logger.info(f"Running backtest: {strategy_name} on {symbol} {timeframe} ({len(df)} bars)")
+
+    # Instantiate strategy
+    strategy_cls = STRATEGY_REGISTRY[strategy_name]
+    config = {
+        "mode": "backtest",
+        "symbol": symbol,
+        "initial_balance": initial_balance,
+    }
+    strategy = strategy_cls(config=config)
+
+    # Feed bars
+    for ts, row in df.iterrows():
+        bar = {
+            "timestamp": ts,
+            "open": float(row["open"]),
+            "high": float(row["high"]),
+            "low": float(row["low"]),
+            "close": float(row["close"]),
+            "volume": float(row["volume"]),
+        }
+        strategy.on_bar(bar)
+
+    # Flatten any remaining position
+    strategy.on_stop()
+
+    # Collect results
+    trades_df = strategy.get_trades_df()
+    metrics = compute_performance_metrics(trades_df)
+
+    result = {
+        "framework": "nautilus",
+        "strategy": strategy_name,
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "exchange": exchange,
+        "initial_balance": initial_balance,
+        "bars_processed": len(df),
+        "metrics": metrics,
+    }
+
+    # Save to results dir
+    safe_symbol = symbol.replace("/", "")
+    result_path = RESULTS_DIR / f"{strategy_name}_{safe_symbol}_{timeframe}.json"
+    with open(result_path, "w") as f:
+        json.dump(result, f, indent=2, default=str)
+    logger.info(f"Results saved to {result_path}")
+
+    return result
+
+
 def run_nautilus_backtest_example():
     """
     Demonstrate NautilusTrader backtest setup.
@@ -94,7 +177,7 @@ def run_nautilus_backtest_example():
     try:
         from nautilus_trader.backtest.engine import BacktestEngine, BacktestEngineConfig
         from nautilus_trader.config import LoggingConfig
-        from nautilus_trader.model.identifiers import Venue
+        from nautilus_trader.model.identifiers import Venue  # noqa: F401
     except ImportError as e:
         logger.error(f"NautilusTrader import failed: {e}")
         logger.info("Install with: pip install nautilus_trader")
@@ -181,6 +264,17 @@ if __name__ == "__main__":
     # Test engine
     sub.add_parser("test", help="Test NautilusTrader engine initialization")
 
+    # Backtest
+    bt = sub.add_parser("backtest", help="Run strategy backtest")
+    bt.add_argument("--strategy", required=True, help="Strategy name from registry")
+    bt.add_argument("--symbol", default="BTC/USDT")
+    bt.add_argument("--timeframe", default="1h")
+    bt.add_argument("--exchange", default="binance")
+    bt.add_argument("--balance", type=float, default=10000.0)
+
+    # List strategies
+    sub.add_parser("list-strategies", help="List registered strategies")
+
     args = parser.parse_args()
 
     if args.command == "convert":
@@ -191,5 +285,13 @@ if __name__ == "__main__":
             print("NautilusTrader engine test: PASSED")
         else:
             print("NautilusTrader engine test: FAILED")
+    elif args.command == "backtest":
+        result = run_nautilus_backtest(
+            args.strategy, args.symbol, args.timeframe, args.exchange, args.balance,
+        )
+        print(json.dumps(result, indent=2, default=str))
+    elif args.command == "list-strategies":
+        for name in list_nautilus_strategies():
+            print(f"  {name}")
     else:
         parser.print_help()

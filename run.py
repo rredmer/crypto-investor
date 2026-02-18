@@ -7,6 +7,7 @@ Master CLI that coordinates all framework tiers:
     - VectorBT Research (rapid strategy screening)
     - Freqtrade (crypto backtesting & live trading)
     - NautilusTrader (multi-asset execution)
+    - hftbacktest (HFT simulation)
     - Risk Management (global position/drawdown limits)
 
 Usage:
@@ -17,6 +18,10 @@ Usage:
     python run.py freqtrade backtest         # Run Freqtrade backtests
     python run.py freqtrade dry-run          # Start Freqtrade paper trading
     python run.py nautilus test              # Test NautilusTrader engine
+    python run.py nautilus backtest          # Run NautilusTrader backtest
+    python run.py nautilus list-strategies   # List Nautilus strategies
+    python run.py hft backtest              # Run HFT backtest
+    python run.py hft list-strategies       # List HFT strategies
     python run.py validate                   # Validate all framework installs
 """
 
@@ -92,7 +97,23 @@ def cmd_status():
     strategies = list(strat_dir.glob("*.py")) if strat_dir.exists() else []
     for s in strategies:
         if not s.name.startswith("__"):
-            print(f"  📊 {s.stem}")
+            print(f"  📊 Freqtrade: {s.stem}")
+
+    # Nautilus strategies
+    try:
+        from nautilus.strategies import STRATEGY_REGISTRY as NT_REG
+        for name in NT_REG:
+            print(f"  📊 Nautilus: {name}")
+    except ImportError:
+        pass
+
+    # HFT strategies
+    try:
+        from hftbacktest.strategies import STRATEGY_REGISTRY as HFT_REG
+        for name in HFT_REG:
+            print(f"  📊 HFT: {name}")
+    except ImportError:
+        pass
 
     # Check research results
     results_dir = PROJECT_ROOT / "research" / "results"
@@ -111,7 +132,7 @@ def cmd_status():
 
     # Environment variables
     env_keys = ["BINANCE_API_KEY", "BYBIT_API_KEY", "TELEGRAM_BOT_TOKEN"]
-    print(f"\n  Environment:")
+    print("\n  Environment:")
     for key in env_keys:
         status = "✅ set" if os.environ.get(key) else "⚠️  not set"
         print(f"    {key}: {status}")
@@ -127,7 +148,9 @@ def cmd_validate():
     tests = [
         ("freqtrade", "from freqtrade.strategy import IStrategy; print('Freqtrade IStrategy: OK')"),
         ("nautilus_trader", "from nautilus_trader.backtest.engine import BacktestEngine; print('NautilusTrader BacktestEngine: OK')"),
+        ("nautilus_strategies", "from nautilus.strategies import STRATEGY_REGISTRY; assert len(STRATEGY_REGISTRY) >= 3; print(f'Nautilus strategies: {len(STRATEGY_REGISTRY)} registered')"),
         ("vectorbt", "import vectorbt as vbt; print(f'VectorBT Portfolio: OK')"),
+        ("hftbacktest_module", "from hftbacktest.strategies import STRATEGY_REGISTRY; assert len(STRATEGY_REGISTRY) >= 1; print(f'HFT strategies: {len(STRATEGY_REGISTRY)} registered')"),
         ("ccxt", "import ccxt; e = ccxt.binance(); print(f'CCXT Binance: OK, {len(e.describe()[\"api\"])} API groups')"),
         ("pandas+numpy", "import pandas as pd; import numpy as np; print(f'Pandas {pd.__version__}, NumPy {np.__version__}: OK')"),
         ("talib", "import talib; print(f'TA-Lib functions: {len(talib.get_functions())} available')"),
@@ -153,7 +176,7 @@ def cmd_validate():
 def cmd_data(args):
     """Data pipeline commands."""
     from common.data_pipeline.pipeline import (
-        download_watchlist, list_available_data, load_ohlcv, fetch_ohlcv, save_ohlcv
+        download_watchlist, list_available_data, load_ohlcv
     )
 
     if args.data_command == "download":
@@ -300,7 +323,7 @@ def cmd_freqtrade(args):
             "--strategy", args.strategy or "CryptoInvestorV1",
             "--strategy-path", str(PROJECT_ROOT / "freqtrade" / "user_data" / "strategies"),
         ]
-        print(f"Starting Freqtrade dry-run (paper trading)...")
+        print("Starting Freqtrade dry-run (paper trading)...")
         print(f"Command: {' '.join(cmd)}")
         print("Press Ctrl+C to stop.\n")
         result = subprocess.run(cmd, cwd=str(PROJECT_ROOT))
@@ -348,8 +371,50 @@ def cmd_nautilus(args):
         if path:
             print(f"✅ Data converted: {path}")
 
+    elif args.nt_command == "backtest":
+        from nautilus.nautilus_runner import run_nautilus_backtest
+        result = run_nautilus_backtest(
+            args.strategy, args.symbol, args.timeframe, args.exchange, args.balance,
+        )
+        print(json.dumps(result, indent=2, default=str))
+
+    elif args.nt_command == "list-strategies":
+        from nautilus.nautilus_runner import list_nautilus_strategies
+        for name in list_nautilus_strategies():
+            print(f"  📊 {name}")
+
     else:
-        print("Usage: python run.py nautilus {test|convert}")
+        print("Usage: python run.py nautilus {test|convert|backtest|list-strategies}")
+
+
+def cmd_hft(args):
+    """hftbacktest commands."""
+    if args.hft_command == "backtest":
+        from hftbacktest.hft_runner import run_hft_backtest
+        result = run_hft_backtest(
+            args.strategy, args.symbol, args.timeframe, args.exchange,
+            args.latency, args.balance,
+        )
+        print(json.dumps(result, indent=2, default=str))
+
+    elif args.hft_command == "convert":
+        from hftbacktest.hft_runner import convert_ohlcv_to_hft_ticks
+        path = convert_ohlcv_to_hft_ticks(args.symbol, args.timeframe, args.exchange)
+        if path:
+            print(f"✅ Tick data generated: {path}")
+
+    elif args.hft_command == "list-strategies":
+        from hftbacktest.hft_runner import list_hft_strategies
+        for name in list_hft_strategies():
+            print(f"  📊 {name}")
+
+    elif args.hft_command == "test":
+        from hftbacktest.hft_runner import list_hft_strategies
+        strategies = list_hft_strategies()
+        print(f"✅ hftbacktest module loaded, {len(strategies)} strategies registered")
+
+    else:
+        print("Usage: python run.py hft {backtest|convert|list-strategies|test}")
 
 
 def main():
@@ -368,6 +433,10 @@ Examples:
   python run.py freqtrade backtest --strategy CryptoInvestorV1
   python run.py freqtrade dry-run
   python run.py nautilus test
+  python run.py nautilus backtest --strategy NautilusTrendFollowing
+  python run.py nautilus list-strategies
+  python run.py hft backtest --strategy MarketMaker
+  python run.py hft list-strategies
         """,
     )
     sub = parser.add_subparsers(dest="command")
@@ -423,6 +492,30 @@ Examples:
     nt_conv.add_argument("--symbol", default="BTC/USDT")
     nt_conv.add_argument("--timeframe", default="1h")
     nt_conv.add_argument("--exchange", default="binance")
+    nt_bt = nt_sub.add_parser("backtest", help="Run NautilusTrader backtest")
+    nt_bt.add_argument("--strategy", required=True, help="Strategy name from registry")
+    nt_bt.add_argument("--symbol", default="BTC/USDT")
+    nt_bt.add_argument("--timeframe", default="1h")
+    nt_bt.add_argument("--exchange", default="binance")
+    nt_bt.add_argument("--balance", type=float, default=10000.0)
+    nt_sub.add_parser("list-strategies", help="List registered strategies")
+
+    # hftbacktest
+    hft_parser = sub.add_parser("hft", help="hftbacktest commands")
+    hft_sub = hft_parser.add_subparsers(dest="hft_command")
+    hft_bt = hft_sub.add_parser("backtest", help="Run HFT backtest")
+    hft_bt.add_argument("--strategy", required=True, help="Strategy name from registry")
+    hft_bt.add_argument("--symbol", default="BTC/USDT")
+    hft_bt.add_argument("--timeframe", default="1h")
+    hft_bt.add_argument("--exchange", default="binance")
+    hft_bt.add_argument("--latency", type=int, default=1_000_000, help="Latency in ns")
+    hft_bt.add_argument("--balance", type=float, default=10000.0)
+    hft_conv = hft_sub.add_parser("convert", help="Convert OHLCV to tick data")
+    hft_conv.add_argument("--symbol", default="BTC/USDT")
+    hft_conv.add_argument("--timeframe", default="1h")
+    hft_conv.add_argument("--exchange", default="binance")
+    hft_sub.add_parser("list-strategies", help="List registered strategies")
+    hft_sub.add_parser("test", help="Test hftbacktest module")
 
     args = parser.parse_args()
 
@@ -438,6 +531,8 @@ Examples:
         cmd_freqtrade(args)
     elif args.command == "nautilus":
         cmd_nautilus(args)
+    elif args.command == "hft":
+        cmd_hft(args)
     else:
         print(LOGO)
         parser.print_help()

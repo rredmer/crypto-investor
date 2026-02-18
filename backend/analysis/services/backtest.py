@@ -1,4 +1,4 @@
-"""Backtest service — wraps Freqtrade (subprocess) and NautilusTrader."""
+"""Backtest service — wraps Freqtrade (subprocess), NautilusTrader, and hftbacktest."""
 
 import json
 import logging
@@ -18,6 +18,8 @@ class BacktestService:
             return BacktestService._run_freqtrade(params, progress_cb)
         elif framework == "nautilus":
             return BacktestService._run_nautilus(params, progress_cb)
+        elif framework == "hftbacktest":
+            return BacktestService._run_hft(params, progress_cb)
         else:
             return {"error": f"Unknown framework: {framework}"}
 
@@ -111,37 +113,73 @@ class BacktestService:
         symbol = params.get("symbol", "BTC/USDT")
         timeframe = params.get("timeframe", "1h")
         exchange = params.get("exchange", "binance")
+        initial_balance = params.get("initial_balance", 10000.0)
 
         progress_cb(0.1, "Loading NautilusTrader...")
         try:
             from nautilus.nautilus_runner import (
-                convert_ohlcv_to_nautilus_csv,
-                run_nautilus_backtest_example,
+                list_nautilus_strategies,
+                run_nautilus_backtest,
             )
         except ImportError as e:
-            return {"error": f"NautilusTrader not available: {e}"}
+            return {"error": f"NautilusTrader module not available: {e}"}
 
-        progress_cb(0.3, "Converting data...")
-        csv_path = convert_ohlcv_to_nautilus_csv(symbol, timeframe, exchange)
-        if not csv_path:
-            return {"error": f"No data for {symbol} {timeframe} on {exchange}"}
+        if not strategy:
+            strategies = list_nautilus_strategies()
+            strategy = strategies[0] if strategies else ""
+        if not strategy:
+            return {"error": "No Nautilus strategy specified and none registered"}
 
-        progress_cb(0.5, "Running backtest engine...")
-        engine = run_nautilus_backtest_example()
-        if not engine:
-            return {"error": "NautilusTrader engine initialization failed"}
+        progress_cb(0.3, f"Running backtest: {strategy}...")
+        result = run_nautilus_backtest(strategy, symbol, timeframe, exchange, initial_balance)
 
-        progress_cb(0.9, "Complete")
-        return {
-            "framework": "nautilus", "strategy": strategy or "example",
-            "symbol": symbol, "timeframe": timeframe,
-            "metrics": {"engine_status": "initialized", "data_path": str(csv_path)},
-        }
+        if "error" in result:
+            return result
+
+        progress_cb(1.0, "Complete")
+        return result
+
+    @staticmethod
+    def _run_hft(params: dict, progress_cb: Callable) -> dict:
+        ensure_platform_imports()
+        strategy = params.get("strategy", "")
+        symbol = params.get("symbol", "BTC/USDT")
+        timeframe = params.get("timeframe", "1h")
+        exchange = params.get("exchange", "binance")
+        initial_balance = params.get("initial_balance", 10000.0)
+        latency_ns = params.get("latency_ns", 1_000_000)
+
+        progress_cb(0.1, "Loading hftbacktest...")
+        try:
+            from hftbacktest.hft_runner import (
+                list_hft_strategies,
+                run_hft_backtest,
+            )
+        except ImportError as e:
+            return {"error": f"hftbacktest module not available: {e}"}
+
+        if not strategy:
+            strategies = list_hft_strategies()
+            strategy = strategies[0] if strategies else ""
+        if not strategy:
+            return {"error": "No HFT strategy specified and none registered"}
+
+        progress_cb(0.3, f"Running HFT backtest: {strategy}...")
+        result = run_hft_backtest(
+            strategy, symbol, timeframe, exchange, latency_ns, initial_balance,
+        )
+
+        if "error" in result:
+            return result
+
+        progress_cb(1.0, "Complete")
+        return result
 
     @staticmethod
     def list_strategies() -> list[dict]:
         strategies = []
 
+        # Freqtrade strategies (file-based)
         ft_dir = get_freqtrade_dir() / "user_data" / "strategies"
         if ft_dir.exists():
             for f in ft_dir.glob("*.py"):
@@ -151,16 +189,25 @@ class BacktestService:
                     "name": f.stem, "framework": "freqtrade", "file_path": str(f),
                 })
 
+        # Nautilus strategies (registry-based)
         ensure_platform_imports()
-        from core.platform_bridge import PROJECT_ROOT
-
-        nautilus_strat_dir = PROJECT_ROOT / "nautilus" / "strategies"
-        if nautilus_strat_dir.exists():
-            for f in nautilus_strat_dir.glob("*.py"):
-                if f.stem.startswith("_"):
-                    continue
+        try:
+            from nautilus.strategies import STRATEGY_REGISTRY as NT_REGISTRY
+            for name in NT_REGISTRY:
                 strategies.append({
-                    "name": f.stem, "framework": "nautilus", "file_path": str(f),
+                    "name": name, "framework": "nautilus", "file_path": "",
                 })
+        except ImportError:
+            pass
+
+        # HFT strategies (registry-based)
+        try:
+            from hftbacktest.strategies import STRATEGY_REGISTRY as HFT_REGISTRY
+            for name in HFT_REGISTRY:
+                strategies.append({
+                    "name": name, "framework": "hftbacktest", "file_path": "",
+                })
+        except ImportError:
+            pass
 
         return strategies

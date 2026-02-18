@@ -123,12 +123,45 @@ nautilus:
   environment: "backtest"  # backtest or live
   log_level: "INFO"
   cache_database: true
-  cache_type: "redis"  # in-memory or redis
+  cache_type: "in-memory"  # in-memory for Jetson 8GB; redis for server deployments
   data_engine:
     time_bars_build_delay: true
   risk_engine:
     max_order_submit_rate: "10/00:00:01"  # 10 orders per second
     max_notional_per_order: 10000.0  # USDT
+
+  # Backtest defaults
+  backtest:
+    initial_balance: 10000.0
+    fee_rate: 0.001          # 0.1% taker fee
+    max_bars_in_memory: 500  # Bounded for Jetson 8GB RAM
+
+  # Per-strategy parameter defaults
+  strategies:
+    NautilusTrendFollowing:
+      ema_fast: 50
+      ema_slow: 200
+      buy_rsi_threshold: 40
+      sell_rsi_threshold: 80
+      atr_multiplier: 2.0
+      stoploss: -0.05
+    NautilusMeanReversion:
+      buy_rsi_threshold: 35
+      sell_rsi_threshold: 65
+      volume_factor: 1.5
+      adx_ceiling: 30
+      atr_multiplier: 1.5
+      stoploss: -0.04
+    NautilusVolatilityBreakout:
+      breakout_period: 20
+      volume_factor: 1.8
+      adx_low: 15
+      adx_high: 25
+      rsi_low: 40
+      rsi_high: 70
+      sell_rsi_threshold: 85
+      atr_multiplier: 1.5
+      stoploss: -0.03
 
 # ──────────────────────────────────────────────
 # VectorBT research configuration
@@ -155,6 +188,24 @@ risk_management:
   max_daily_loss: 0.05          # 5% daily loss limit
   max_correlation: 0.7          # Max correlation between concurrent positions
   min_paper_trade_days: 14      # Minimum paper trading before live
+
+# ──────────────────────────────────────────────
+# hftbacktest configuration (Tier 4 — HFT)
+# ──────────────────────────────────────────────
+hftbacktest:
+  latency_ns: 1000000          # 1ms simulated latency
+  fee_rate: 0.0002             # 0.02% maker fee (HFT typically maker)
+  initial_balance: 10000.0
+  ticks_per_bar: 4             # Synthetic ticks generated per OHLCV bar
+
+  strategies:
+    MarketMaker:
+      half_spread: 0.001       # 10 bps half-spread
+      skew_factor: 0.0005      # Inventory skew per unit
+      order_size: 0.01         # Base currency units per quote
+      max_position: 1.0        # Max absolute position
+      drawdown_halt_pct: 0.05  # Halt at 5% drawdown
+      quote_interval: 4        # Requote every N ticks
 
 # ──────────────────────────────────────────────
 # Monitoring & alerts

@@ -588,6 +588,28 @@ def to_vectorbt_format(df: pd.DataFrame) -> pd.DataFrame:
     return df.copy()
 
 
+def to_hftbacktest_ticks(df: pd.DataFrame) -> np.ndarray:
+    """Convert OHLCV DataFrame to synthetic tick numpy arrays for hftbacktest.
+
+    Generates 4 ticks per bar (O/H/L/C) with interpolated nanosecond timestamps.
+    Returns array of shape (N*4, 4): [timestamp_ns, price, volume, side].
+    Side: +1 = buy, -1 = sell. This is a development approximation.
+    """
+    ticks = []
+    for ts, row in df.iterrows():
+        ts_ns = int(ts.value)
+        quarter = 900_000_000_000  # 15min in ns (default quarter of 1h)
+        vol = float(row["volume"]) / 4
+
+        ticks.append([ts_ns, float(row["open"]), vol, 1])
+        ticks.append([ts_ns + quarter, float(row["high"]), vol, 1])
+        ticks.append([ts_ns + 2 * quarter, float(row["low"]), vol, -1])
+        side = 1 if float(row["close"]) >= float(row["open"]) else -1
+        ticks.append([ts_ns + 3 * quarter, float(row["close"]), vol, side])
+
+    return np.array(ticks, dtype=np.float64)
+
+
 def to_nautilus_bars(df: pd.DataFrame, symbol: str) -> list:
     """Convert OHLCV DataFrame to a list of dicts for NautilusTrader bar ingestion."""
     bars = []

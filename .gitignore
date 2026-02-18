@@ -65,6 +65,11 @@ research/results/
 nautilus/catalog/
 nautilus/results/
 
+# hftbacktest generated data
+hftbacktest/catalog/
+hftbacktest/results/
+data/ticks/
+
 # Logs
 logs/
 *.log
