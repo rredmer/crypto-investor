@@ -193,46 +193,58 @@ class ExchangeListView(APIView):
 
 
 class TickerView(APIView):
-    async def get(self, request: Request, symbol: str) -> Response:
+    def get(self, request: Request, symbol: str) -> Response:
+        from asgiref.sync import async_to_sync
+
         from market.services.exchange import ExchangeService
 
-        service = ExchangeService()
-        try:
-            ticker = await service.fetch_ticker(symbol)
-            return Response(ticker)
-        finally:
-            await service.close()
+        async def _fetch():
+            service = ExchangeService()
+            try:
+                return await service.fetch_ticker(symbol)
+            finally:
+                await service.close()
+
+        return Response(async_to_sync(_fetch)())
 
 
 class TickerListView(APIView):
-    async def get(self, request: Request) -> Response:
+    def get(self, request: Request) -> Response:
+        from asgiref.sync import async_to_sync
+
         from market.services.exchange import ExchangeService
 
         symbols_param = request.query_params.get("symbols")
         symbol_list = symbols_param.split(",") if symbols_param else None
 
-        service = ExchangeService()
-        try:
-            tickers = await service.fetch_tickers(symbol_list)
-            return Response(tickers)
-        finally:
-            await service.close()
+        async def _fetch():
+            service = ExchangeService()
+            try:
+                return await service.fetch_tickers(symbol_list)
+            finally:
+                await service.close()
+
+        return Response(async_to_sync(_fetch)())
 
 
 class OHLCVView(APIView):
-    async def get(self, request: Request, symbol: str) -> Response:
+    def get(self, request: Request, symbol: str) -> Response:
+        from asgiref.sync import async_to_sync
+
         from market.services.exchange import ExchangeService
 
         timeframe = request.query_params.get("timeframe", "1h")
         limit = int(request.query_params.get("limit", 100))
         limit = max(1, min(limit, 1000))
 
-        service = ExchangeService()
-        try:
-            data = await service.fetch_ohlcv(symbol, timeframe, limit)
-            return Response(data)
-        finally:
-            await service.close()
+        async def _fetch():
+            service = ExchangeService()
+            try:
+                return await service.fetch_ohlcv(symbol, timeframe, limit)
+            finally:
+                await service.close()
+
+        return Response(async_to_sync(_fetch)())
 
 
 class IndicatorListView(APIView):

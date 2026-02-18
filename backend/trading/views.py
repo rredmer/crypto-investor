@@ -90,37 +90,38 @@ class OrderCancelView(APIView):
 
 
 class LiveTradingStatusView(APIView):
-    async def get(self, request: Request) -> Response:
+    def get(self, request: Request) -> Response:
         from market.services.exchange import ExchangeService
         from risk.models import RiskState
 
         portfolio_id = int(request.query_params.get("portfolio_id", 1))
 
-        from asgiref.sync import sync_to_async
-
-        state = await sync_to_async(
-            lambda: RiskState.objects.filter(portfolio_id=portfolio_id).first()
-        )()
+        state = RiskState.objects.filter(portfolio_id=portfolio_id).first()
         is_halted = state.is_halted if state else False
 
         exchange_ok = False
         exchange_error = ""
-        service = ExchangeService()
-        try:
-            exchange = await service._get_exchange()
-            await exchange.load_markets()
-            exchange_ok = True
-        except Exception as e:
-            exchange_error = str(e)[:200]
-        finally:
-            await service.close()
 
-        active_count = await sync_to_async(
-            Order.objects.filter(
-                mode=TradingMode.LIVE,
-                status__in=[OrderStatus.SUBMITTED, OrderStatus.OPEN, OrderStatus.PARTIAL_FILL],
-            ).count
-        )()
+        async def _check_exchange():
+            service = ExchangeService()
+            try:
+                exchange = await service._get_exchange()
+                await exchange.load_markets()
+                return True, ""
+            except Exception as e:
+                return False, str(e)[:200]
+            finally:
+                await service.close()
+
+        exchange_ok, exchange_error = async_to_sync(_check_exchange)()
+
+        active_count = Order.objects.filter(
+            mode=TradingMode.LIVE,
+            status__in=[
+                OrderStatus.SUBMITTED, OrderStatus.OPEN,
+                OrderStatus.PARTIAL_FILL,
+            ],
+        ).count()
 
         return Response({
             "exchange_connected": exchange_ok,
@@ -150,36 +151,34 @@ class PaperTradingStopView(APIView):
 
 
 class PaperTradingTradesView(APIView):
-    async def get(self, request: Request) -> Response:
+    def get(self, request: Request) -> Response:
         service = _get_paper_trading_service()
-        trades = await service.get_open_trades()
-        return Response(trades)
+        return Response(async_to_sync(service.get_open_trades)())
 
 
 class PaperTradingHistoryView(APIView):
-    async def get(self, request: Request) -> Response:
+    def get(self, request: Request) -> Response:
         limit = int(request.query_params.get("limit", 50))
         service = _get_paper_trading_service()
-        trades = await service.get_trade_history(limit)
-        return Response(trades)
+        return Response(async_to_sync(service.get_trade_history)(limit))
 
 
 class PaperTradingProfitView(APIView):
-    async def get(self, request: Request) -> Response:
+    def get(self, request: Request) -> Response:
         service = _get_paper_trading_service()
-        return Response(await service.get_profit())
+        return Response(async_to_sync(service.get_profit)())
 
 
 class PaperTradingPerformanceView(APIView):
-    async def get(self, request: Request) -> Response:
+    def get(self, request: Request) -> Response:
         service = _get_paper_trading_service()
-        return Response(await service.get_performance())
+        return Response(async_to_sync(service.get_performance)())
 
 
 class PaperTradingBalanceView(APIView):
-    async def get(self, request: Request) -> Response:
+    def get(self, request: Request) -> Response:
         service = _get_paper_trading_service()
-        return Response(await service.get_balance())
+        return Response(async_to_sync(service.get_balance)())
 
 
 class PaperTradingLogView(APIView):

@@ -96,19 +96,23 @@ class RecordMetricsView(APIView):
 
 
 class HaltTradingView(APIView):
-    async def post(self, request: Request, portfolio_id: int) -> Response:
+    def post(self, request: Request, portfolio_id: int) -> Response:
+        from asgiref.sync import async_to_sync
+
         reason = request.data.get("reason", "")
-        result = await RiskManagementService.halt_trading_with_cancellation(
-            portfolio_id, reason
-        )
+        result = async_to_sync(
+            RiskManagementService.halt_trading_with_cancellation
+        )(portfolio_id, reason)
         return Response(result)
 
 
 class ResumeTradingView(APIView):
-    async def post(self, request: Request, portfolio_id: int) -> Response:
-        result = await RiskManagementService.resume_trading_with_broadcast(
-            portfolio_id
-        )
+    def post(self, request: Request, portfolio_id: int) -> Response:
+        from asgiref.sync import async_to_sync
+
+        result = async_to_sync(
+            RiskManagementService.resume_trading_with_broadcast
+        )(portfolio_id)
         return Response(result)
 
 
