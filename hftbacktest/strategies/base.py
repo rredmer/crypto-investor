@@ -8,11 +8,15 @@ Shared functionality for all hftbacktest strategies:
 - Tick-by-tick processing loop
 """
 
-import logging
-from typing import Optional
+from __future__ import annotations
 
-import numpy as np
+import logging
+from typing import TYPE_CHECKING, Optional
+
 import pandas as pd
+
+if TYPE_CHECKING:
+    import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +38,7 @@ class HFTBaseStrategy:
         self.config = config or {}
         self.initial_balance = self.config.get("initial_balance", 10000.0)
         self.max_position = self.config.get("max_position", self.max_position)
+        self.fee_rate: float = self.config.get("fee_rate", 0.0002)  # 0.02% maker fee
 
         # State
         self.position: float = 0.0  # Signed position (+ long, - short)
@@ -76,13 +81,18 @@ class HFTBaseStrategy:
             return None
 
         # Simulate fill at the given price
+        fee = price * size * self.fee_rate
         fill = {
             "timestamp": tick["timestamp"],
             "side": side,
             "price": price,
             "size": size,
+            "fee": fee,
             "position_after": new_position,
         }
+
+        # Deduct fee from balance
+        self.balance -= fee
 
         # Update position and PnL
         if side == "buy":
@@ -141,35 +151,60 @@ class HFTBaseStrategy:
         return False
 
     def get_trades_df(self) -> pd.DataFrame:
-        """Convert fills to a trades DataFrame compatible with compute_performance_metrics."""
+        """Convert fills to round-trip trades using FIFO position tracking.
+
+        Handles consecutive same-side fills (accumulation) and partial closes
+        correctly for market-maker workloads.
+        """
         if not self.fills:
             return pd.DataFrame()
 
-        # Pair fills into round-trip trades
         trades = []
-        entry_fill = None
+        # FIFO queue of open entries: [(timestamp, price, remaining_size, side)]
+        open_entries: list[list] = []
+
         for fill in self.fills:
-            if entry_fill is None:
-                entry_fill = fill
-            elif fill["side"] != entry_fill["side"]:
-                # Opposite side = closing trade
-                if entry_fill["side"] == "buy":
-                    pnl = (fill["price"] - entry_fill["price"]) * entry_fill["size"]
-                    pnl_pct = (fill["price"] / entry_fill["price"]) - 1
-                else:
-                    pnl = (entry_fill["price"] - fill["price"]) * entry_fill["size"]
-                    pnl_pct = (entry_fill["price"] / fill["price"]) - 1
-                trades.append({
-                    "entry_time": pd.Timestamp(entry_fill["timestamp"], unit="ns", tz="UTC"),
-                    "exit_time": pd.Timestamp(fill["timestamp"], unit="ns", tz="UTC"),
-                    "side": entry_fill["side"],
-                    "entry_price": entry_fill["price"],
-                    "exit_price": fill["price"],
-                    "size": entry_fill["size"],
-                    "pnl": pnl,
-                    "pnl_pct": pnl_pct,
-                })
-                entry_fill = None
+            fill_side = fill["side"]
+            remaining = fill["size"]
+
+            # Determine if this fill closes existing entries
+            if open_entries and open_entries[0][3] != fill_side:
+                # Opposite side — close FIFO entries
+                while remaining > 0 and open_entries:
+                    entry = open_entries[0]
+                    close_size = min(remaining, entry[2])
+
+                    if entry[3] == "buy":
+                        pnl = (fill["price"] - entry[1]) * close_size
+                        pnl_pct = (fill["price"] / entry[1]) - 1
+                    else:
+                        pnl = (entry[1] - fill["price"]) * close_size
+                        pnl_pct = (entry[1] / fill["price"]) - 1
+
+                    entry_fee = entry[1] * close_size * self.fee_rate
+                    exit_fee = fill["price"] * close_size * self.fee_rate
+                    total_fee = entry_fee + exit_fee
+
+                    trades.append({
+                        "entry_time": pd.Timestamp(entry[0], unit="ns", tz="UTC"),
+                        "exit_time": pd.Timestamp(fill["timestamp"], unit="ns", tz="UTC"),
+                        "side": entry[3],
+                        "entry_price": entry[1],
+                        "exit_price": fill["price"],
+                        "size": close_size,
+                        "pnl": pnl - total_fee,
+                        "pnl_pct": pnl_pct - (2 * self.fee_rate),
+                        "fee": total_fee,
+                    })
+
+                    entry[2] -= close_size
+                    remaining -= close_size
+                    if entry[2] <= 1e-12:
+                        open_entries.pop(0)
+
+            # Any remaining size becomes a new open entry
+            if remaining > 1e-12:
+                open_entries.append([fill["timestamp"], fill["price"], remaining, fill_side])
 
         if not trades:
             return pd.DataFrame()

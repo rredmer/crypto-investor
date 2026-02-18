@@ -115,13 +115,33 @@ class TestHFTBase:
     def test_round_trip_pnl(self):
         from hftbacktest.strategies.base import HFTBaseStrategy
 
-        s = HFTBaseStrategy()
+        s = HFTBaseStrategy(config={"fee_rate": 0.0})  # zero fees for legacy test
         tick1 = {"timestamp": 1000, "price": 100.0, "volume": 0.1, "side": "sell"}
         tick2 = {"timestamp": 2000, "price": 110.0, "volume": 0.1, "side": "buy"}
         s.submit_order("buy", 100.0, 1.0, tick1)
         s.submit_order("sell", 110.0, 1.0, tick2)
         assert s.position == 0.0
         assert s.realized_pnl == pytest.approx(10.0)
+
+    def test_round_trip_pnl_with_fees(self):
+        from hftbacktest.strategies.base import HFTBaseStrategy
+
+        fee_rate = 0.0002
+        s = HFTBaseStrategy(config={"fee_rate": fee_rate})
+        tick1 = {"timestamp": 1000, "price": 100.0, "volume": 0.1, "side": "sell"}
+        tick2 = {"timestamp": 2000, "price": 110.0, "volume": 0.1, "side": "buy"}
+        s.submit_order("buy", 100.0, 1.0, tick1)
+        s.submit_order("sell", 110.0, 1.0, tick2)
+        assert s.position == 0.0
+        # Gross PnL = 10.0, fees = 100*1*0.0002 + 110*1*0.0002 = 0.042
+        expected_fees = 100.0 * 1.0 * fee_rate + 110.0 * 1.0 * fee_rate
+        assert s.realized_pnl == pytest.approx(10.0)  # realized_pnl tracks gross
+        # Balance = initial - fees + gross pnl
+        assert s.balance == pytest.approx(10000.0 + 10.0 - expected_fees)
+        # Fills have fee field
+        assert "fee" in s.fills[0]
+        assert s.fills[0]["fee"] == pytest.approx(100.0 * 1.0 * fee_rate)
+        assert s.fills[1]["fee"] == pytest.approx(110.0 * 1.0 * fee_rate)
 
     def test_drawdown_halt(self):
         from hftbacktest.strategies.base import HFTBaseStrategy
@@ -139,6 +159,42 @@ class TestHFTBase:
         tick = {"timestamp": 1000, "price": 100.0, "volume": 0.1, "side": "sell"}
         fill = s.submit_order("buy", 100.0, 0.5, tick)
         assert fill is None
+
+    def test_fifo_trades_df_consecutive_buys(self):
+        """Multiple buys then one sell should produce correct FIFO trades."""
+        from hftbacktest.strategies.base import HFTBaseStrategy
+
+        s = HFTBaseStrategy(config={"fee_rate": 0.0, "max_position": 5.0})
+        t1 = {"timestamp": 1000, "price": 100.0, "volume": 1.0, "side": "sell"}
+        t2 = {"timestamp": 2000, "price": 102.0, "volume": 1.0, "side": "sell"}
+        t3 = {"timestamp": 3000, "price": 110.0, "volume": 1.0, "side": "buy"}
+        s.submit_order("buy", 100.0, 1.0, t1)
+        s.submit_order("buy", 102.0, 1.0, t2)
+        s.submit_order("sell", 110.0, 2.0, t3)
+        df = s.get_trades_df()
+        assert len(df) == 2  # Two FIFO round-trips
+        # First trade: bought at 100, sold at 110 -> pnl = 10
+        assert df.iloc[0]["entry_price"] == pytest.approx(100.0)
+        assert df.iloc[0]["pnl"] == pytest.approx(10.0)
+        # Second trade: bought at 102, sold at 110 -> pnl = 8
+        assert df.iloc[1]["entry_price"] == pytest.approx(102.0)
+        assert df.iloc[1]["pnl"] == pytest.approx(8.0)
+
+    def test_fifo_trades_df_includes_fee(self):
+        """FIFO trades should include fee deduction."""
+        from hftbacktest.strategies.base import HFTBaseStrategy
+
+        fee_rate = 0.001
+        s = HFTBaseStrategy(config={"fee_rate": fee_rate})
+        t1 = {"timestamp": 1000, "price": 100.0, "volume": 1.0, "side": "sell"}
+        t2 = {"timestamp": 2000, "price": 110.0, "volume": 1.0, "side": "buy"}
+        s.submit_order("buy", 100.0, 1.0, t1)
+        s.submit_order("sell", 110.0, 1.0, t2)
+        df = s.get_trades_df()
+        assert len(df) == 1
+        expected_fee = 100.0 * 1.0 * fee_rate + 110.0 * 1.0 * fee_rate
+        assert df.iloc[0]["fee"] == pytest.approx(expected_fee)
+        assert df.iloc[0]["pnl"] == pytest.approx(10.0 - expected_fee)
 
 
 # ── Market Maker Tests ───────────────────────────────
