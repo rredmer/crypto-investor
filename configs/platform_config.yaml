@@ -5,7 +5,7 @@
 platform:
   name: "crypto-investor"
   version: "0.1.0"
-  base_dir: "~/Dev/crypto-investor"
+  base_dir: "."
   log_level: "INFO"
 
 # ──────────────────────────────────────────────

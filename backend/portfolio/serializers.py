@@ -35,3 +35,14 @@ class PortfolioCreateSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=100)
     exchange_id = serializers.CharField(max_length=50, default="binance")
     description = serializers.CharField(max_length=500, default="", allow_blank=True)
+
+
+class PortfolioUpdateSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=100, required=False)
+    exchange_id = serializers.CharField(max_length=50, required=False)
+    description = serializers.CharField(max_length=500, required=False, allow_blank=True)
+
+
+class HoldingUpdateSerializer(serializers.Serializer):
+    amount = serializers.FloatField(required=False)
+    avg_buy_price = serializers.FloatField(required=False)

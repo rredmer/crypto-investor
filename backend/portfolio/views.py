@@ -8,8 +8,10 @@ from portfolio.models import Holding, Portfolio
 from portfolio.serializers import (
     HoldingCreateSerializer,
     HoldingSerializer,
+    HoldingUpdateSerializer,
     PortfolioCreateSerializer,
     PortfolioSerializer,
+    PortfolioUpdateSerializer,
 )
 
 
@@ -41,6 +43,27 @@ class PortfolioDetailView(APIView):
             return Response({"error": "Portfolio not found"}, status=status.HTTP_404_NOT_FOUND)
         return Response(PortfolioSerializer(portfolio).data)
 
+    @extend_schema(
+        request=PortfolioUpdateSerializer, responses=PortfolioSerializer, tags=["Portfolio"],
+    )
+    def put(self, request: Request, portfolio_id: int) -> Response:
+        try:
+            portfolio = Portfolio.objects.prefetch_related("holdings").get(id=portfolio_id)
+        except Portfolio.DoesNotExist:
+            return Response({"error": "Portfolio not found"}, status=status.HTTP_404_NOT_FOUND)
+        ser = PortfolioUpdateSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        for field, value in ser.validated_data.items():
+            setattr(portfolio, field, value)
+        portfolio.save()
+        return Response(PortfolioSerializer(portfolio).data)
+
+    @extend_schema(
+        request=PortfolioUpdateSerializer, responses=PortfolioSerializer, tags=["Portfolio"],
+    )
+    def patch(self, request: Request, portfolio_id: int) -> Response:
+        return self.put(request, portfolio_id)
+
     @extend_schema(tags=["Portfolio"])
     def delete(self, request: Request, portfolio_id: int) -> Response:
         try:
@@ -48,6 +71,32 @@ class PortfolioDetailView(APIView):
         except Portfolio.DoesNotExist:
             return Response({"error": "Portfolio not found"}, status=status.HTTP_404_NOT_FOUND)
         portfolio.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class HoldingDetailView(APIView):
+    @extend_schema(
+        request=HoldingUpdateSerializer, responses=HoldingSerializer, tags=["Portfolio"],
+    )
+    def put(self, request: Request, portfolio_id: int, holding_id: int) -> Response:
+        try:
+            holding = Holding.objects.get(id=holding_id, portfolio_id=portfolio_id)
+        except Holding.DoesNotExist:
+            return Response({"error": "Holding not found"}, status=status.HTTP_404_NOT_FOUND)
+        ser = HoldingUpdateSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        for field, value in ser.validated_data.items():
+            setattr(holding, field, value)
+        holding.save()
+        return Response(HoldingSerializer(holding).data)
+
+    @extend_schema(tags=["Portfolio"])
+    def delete(self, request: Request, portfolio_id: int, holding_id: int) -> Response:
+        try:
+            holding = Holding.objects.get(id=holding_id, portfolio_id=portfolio_id)
+        except Holding.DoesNotExist:
+            return Response({"error": "Holding not found"}, status=status.HTTP_404_NOT_FOUND)
+        holding.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

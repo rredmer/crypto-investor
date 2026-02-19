@@ -66,6 +66,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "core.middleware.CSPMiddleware",
     "core.middleware.RateLimitMiddleware",
     "core.middleware.MetricsMiddleware",
     "core.middleware.AuditMiddleware",
@@ -140,6 +141,14 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
+SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
+
+# Content-Security-Policy via middleware header
+CSP_DEFAULT_SRC = "'self'"
+CSP_SCRIPT_SRC = "'self'"
+CSP_STYLE_SRC = "'self' 'unsafe-inline'"
+CSP_IMG_SRC = "'self' data:"
+CSP_CONNECT_SRC = "'self' ws: wss:"
 
 if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000

@@ -10,6 +10,7 @@ import {
   Activity,
   Play,
   PlayCircle,
+  BrainCircuit,
   Settings,
   LogOut,
 } from "lucide-react";
@@ -28,6 +29,7 @@ const navItems = [
   { to: "/regime", icon: Activity, label: "Regime" },
   { to: "/backtest", icon: Play, label: "Backtest" },
   { to: "/paper-trading", icon: PlayCircle, label: "Paper Trade" },
+  { to: "/ml", icon: BrainCircuit, label: "ML Models" },
   { to: "/settings", icon: Settings, label: "Settings" },
 ];
 

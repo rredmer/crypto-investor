@@ -13,11 +13,11 @@ class TestMetricsEndpoint:
         assert resp.status_code == 200
         assert resp["Content-Type"].startswith("text/plain")
 
-    def test_metrics_requires_auth(self):
-        """Metrics endpoint should require authentication."""
+    def test_metrics_allows_unauthenticated(self):
+        """Metrics endpoint is public for Prometheus scraping."""
         client = Client()
         resp = client.get("/metrics/")
-        assert resp.status_code == 403
+        assert resp.status_code == 200
 
     def test_metrics_contains_gauges(self, authenticated_client):
         """After hitting metrics, we should see active_orders gauges."""

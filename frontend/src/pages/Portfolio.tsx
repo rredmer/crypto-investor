@@ -95,7 +95,7 @@ export function PortfolioPage() {
                       </p>
                     )}
 
-                    <HoldingsTable holdings={p.holdings} priceMap={priceMap} />
+                    <HoldingsTable holdings={p.holdings} portfolioId={p.id} priceMap={priceMap} />
                   </div>
                 );
               })}

@@ -1,0 +1,73 @@
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { screen, waitFor } from "@testing-library/react";
+import { MLModels } from "../src/pages/MLModels";
+import { renderWithProviders, mockFetch } from "./helpers";
+
+const mockModels = [
+  {
+    model_id: "model-001",
+    symbol: "BTC/USDT",
+    timeframe: "1h",
+    exchange: "binance",
+    created_at: "2024-06-01T12:00:00Z",
+  },
+];
+
+beforeEach(() => {
+  vi.stubGlobal(
+    "fetch",
+    mockFetch({
+      "/api/ml/models/": mockModels,
+    }),
+  );
+});
+
+describe("MLModels", () => {
+  it("renders the page title", () => {
+    renderWithProviders(<MLModels />);
+    expect(screen.getByText("ML Models")).toBeInTheDocument();
+  });
+
+  it("renders train form", () => {
+    renderWithProviders(<MLModels />);
+    expect(screen.getByRole("button", { name: "Train Model" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Train Model" })).toBeInTheDocument();
+  });
+
+  it("renders predict section", () => {
+    renderWithProviders(<MLModels />);
+    expect(screen.getByText("Predict")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Run Prediction" })).toBeInTheDocument();
+  });
+
+  it("renders model summary card", () => {
+    renderWithProviders(<MLModels />);
+    expect(screen.getByText("Model Summary")).toBeInTheDocument();
+  });
+
+  it("shows trained models table when data loads", async () => {
+    renderWithProviders(<MLModels />);
+    await waitFor(() => {
+      expect(screen.getByText("model-001")).toBeInTheDocument();
+    });
+    expect(screen.getByText("BTC/USDT")).toBeInTheDocument();
+  });
+
+  it("shows empty state when no models", async () => {
+    vi.stubGlobal(
+      "fetch",
+      mockFetch({ "/api/ml/models/": [] }),
+    );
+    renderWithProviders(<MLModels />);
+    await waitFor(() => {
+      expect(
+        screen.getByText("No trained models yet. Use the training form to create one."),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("predict button is disabled without model selected", () => {
+    renderWithProviders(<MLModels />);
+    expect(screen.getByRole("button", { name: "Run Prediction" })).toBeDisabled();
+  });
+});

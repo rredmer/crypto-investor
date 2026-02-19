@@ -17,7 +17,7 @@ services:
       EXCHANGE_API_SECRET: "${EXCHANGE_API_SECRET:-}"
       TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN:-}"
       TELEGRAM_CHAT_ID: "${TELEGRAM_CHAT_ID:-}"
-      WEBHOOK_URL: "${WEBHOOK_URL:-}"
+      NOTIFICATION_WEBHOOK_URL: "${NOTIFICATION_WEBHOOK_URL:-}"
     volumes:
       - backend-data:/app/data
     restart: unless-stopped

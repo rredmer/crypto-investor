@@ -7,7 +7,7 @@ def _set_sqlite_pragmas(sender, connection, **kwargs):
     if connection.vendor == "sqlite":
         cursor = connection.cursor()
         cursor.execute("PRAGMA journal_mode=WAL;")
-        cursor.execute("PRAGMA synchronous=FULL;")
+        cursor.execute("PRAGMA synchronous=NORMAL;")
 
 
 class CoreConfig(AppConfig):

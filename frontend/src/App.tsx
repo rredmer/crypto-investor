@@ -12,6 +12,7 @@ import { Backtesting } from "./pages/Backtesting";
 import { RegimeDashboard } from "./pages/RegimeDashboard";
 import { PaperTrading } from "./pages/PaperTrading";
 import { Settings } from "./pages/Settings";
+import { MLModels } from "./pages/MLModels";
 import { useAuth } from "./hooks/useAuth";
 
 export default function App() {
@@ -56,6 +57,7 @@ export default function App() {
         <Route path="/regime" element={<RegimeDashboard />} />
         <Route path="/backtest" element={<Backtesting />} />
         <Route path="/paper-trading" element={<PaperTrading />} />
+        <Route path="/ml" element={<MLModels />} />
         <Route path="/settings" element={<Settings />} />
       </Route>
     </Routes>

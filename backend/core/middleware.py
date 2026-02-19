@@ -62,6 +62,31 @@ class RequestIDMiddleware:
         return response
 
 
+class CSPMiddleware:
+    """Add Content-Security-Policy header from settings."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+        directives = []
+        for directive, setting in [
+            ("default-src", "CSP_DEFAULT_SRC"),
+            ("script-src", "CSP_SCRIPT_SRC"),
+            ("style-src", "CSP_STYLE_SRC"),
+            ("img-src", "CSP_IMG_SRC"),
+            ("connect-src", "CSP_CONNECT_SRC"),
+        ]:
+            value = getattr(settings, setting, None)
+            if value:
+                directives.append(f"{directive} {value}")
+        self._header = "; ".join(directives) if directives else ""
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        if self._header:
+            response["Content-Security-Policy"] = self._header
+        return response
+
+
 class RateLimitMiddleware:
     """In-memory sliding window rate limiter."""
 
