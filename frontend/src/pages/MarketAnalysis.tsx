@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useApi } from "../hooks/useApi";
 import { marketApi } from "../api/market";
 import { indicatorsApi, type IndicatorData } from "../api/indicators";
 import { PriceChart } from "../components/PriceChart";
@@ -16,10 +15,10 @@ export function MarketAnalysis() {
   const [exchange, setExchange] = useState("sample");
   const [selectedIndicators, setSelectedIndicators] = useState<string[]>([]);
 
-  const { data: ohlcv, isLoading } = useApi<OHLCVData[]>(
-    ["ohlcv", symbol, timeframe],
-    () => marketApi.ohlcv(symbol, timeframe),
-  );
+  const { data: ohlcv, isLoading } = useQuery<OHLCVData[]>({
+    queryKey: ["ohlcv", symbol, timeframe],
+    queryFn: () => marketApi.ohlcv(symbol, timeframe),
+  });
 
   const { data: indicatorData } = useQuery<IndicatorData>({
     queryKey: ["indicators", exchange, symbol, timeframe, selectedIndicators],
@@ -104,7 +103,11 @@ export function MarketAnalysis() {
       </div>
 
       <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-        {isLoading && <p className="text-sm">Loading chart data...</p>}
+        {isLoading && (
+          <div className="flex h-64 items-center justify-center">
+            <div className="h-full w-full animate-pulse rounded bg-[var(--color-border)]" />
+          </div>
+        )}
         {ohlcv && (
           <PriceChart
             data={ohlcv}

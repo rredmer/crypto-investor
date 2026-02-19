@@ -448,6 +448,128 @@ class TestNautilusDataConversion:
         assert "bar_type" in csv_df.columns
 
 
+# ── Dual-Mode Runner Tests ──────────────────────────
+
+
+class TestRunnerDualMode:
+    def test_has_nautilus_trader_flag(self):
+        from nautilus.engine import HAS_NAUTILUS_TRADER
+
+        # Should be a boolean regardless of installation
+        assert isinstance(HAS_NAUTILUS_TRADER, bool)
+
+    def test_backtest_returns_engine_field(self):
+        """run_nautilus_backtest result should include 'engine' field."""
+        from common.data_pipeline.pipeline import save_ohlcv
+        from nautilus.nautilus_runner import run_nautilus_backtest
+
+        df = _make_ohlcv(300)
+        save_ohlcv(df, "DUALTEST/USDT", "1h", "testexch")
+        result = run_nautilus_backtest(
+            "NautilusTrendFollowing", "DUALTEST/USDT", "1h", "testexch", 10000.0,
+        )
+        assert "engine" in result
+        assert result["engine"] in ("native", "pandas")
+
+    def test_pandas_fallback_produces_metrics(self):
+        """When NT is not installed, pandas fallback should produce metrics."""
+        from nautilus.nautilus_runner import _run_pandas_backtest
+
+        df = _make_ohlcv(300)
+        result = _run_pandas_backtest(
+            "NautilusTrendFollowing", df, "BTC/USDT", "1h", "binance", 10000.0,
+        )
+        assert result["engine"] == "pandas"
+        assert "metrics" in result
+
+    def test_list_strategies_shows_mode(self):
+        from nautilus.nautilus_runner import HAS_NAUTILUS_TRADER, list_nautilus_strategies
+
+        names = list_nautilus_strategies()
+        assert len(names) == 3
+        # HAS_NAUTILUS_TRADER is accessible
+        assert isinstance(HAS_NAUTILUS_TRADER, bool)
+
+
+# ── Native Engine Tests (skip when NT not installed) ─
+
+
+try:
+    from nautilus.engine import HAS_NAUTILUS_TRADER as _HAS_NT
+except ImportError:
+    _HAS_NT = False
+
+_skip_no_nt = pytest.mark.skipif(
+    not _HAS_NT, reason="nautilus_trader not installed"
+)
+
+
+@_skip_no_nt
+class TestNativeEngine:
+    def test_create_engine(self):
+        from nautilus.engine import create_backtest_engine
+
+        engine = create_backtest_engine(log_level="WARNING")
+        assert engine is not None
+        engine.dispose()
+
+    def test_add_venue(self):
+        from nautilus.engine import add_venue, create_backtest_engine
+
+        engine = create_backtest_engine(log_level="WARNING")
+        venue = add_venue(engine, "BINANCE", starting_balance=10000.0)
+        assert venue is not None
+        engine.dispose()
+
+    def test_create_instrument(self):
+        from nautilus.engine import create_crypto_instrument
+
+        instrument_id = create_crypto_instrument("BTC/USDT", "BINANCE")
+        assert "BTCUSDT" in str(instrument_id)
+
+    def test_build_bar_type(self):
+        from nautilus.engine import build_bar_type, create_crypto_instrument
+
+        instrument_id = create_crypto_instrument("BTC/USDT", "BINANCE")
+        bar_type = build_bar_type(instrument_id, "1h")
+        assert "HOUR" in str(bar_type)
+
+    def test_convert_df_to_bars(self):
+        from nautilus.engine import (
+            build_bar_type,
+            convert_df_to_bars,
+            create_crypto_instrument,
+        )
+
+        instrument_id = create_crypto_instrument("BTC/USDT", "BINANCE")
+        bar_type = build_bar_type(instrument_id, "1h")
+        df = _make_ohlcv(10)
+        bars = convert_df_to_bars(df, bar_type)
+        assert len(bars) == 10
+
+    def test_native_strategy_registry(self):
+        from nautilus.strategies.nt_native import NATIVE_STRATEGY_REGISTRY
+
+        assert len(NATIVE_STRATEGY_REGISTRY) == 3
+        assert "NativeTrendFollowing" in NATIVE_STRATEGY_REGISTRY
+
+    def test_engine_test_function(self):
+        from nautilus.nautilus_runner import run_nautilus_engine_test
+
+        assert run_nautilus_engine_test() is True
+
+    def test_native_backtest_runs(self):
+        from common.data_pipeline.pipeline import save_ohlcv
+        from nautilus.nautilus_runner import run_nautilus_backtest
+
+        df = _make_ohlcv(300)
+        save_ohlcv(df, "NATIVE/USDT", "1h", "testexch")
+        result = run_nautilus_backtest(
+            "NautilusTrendFollowing", "NATIVE/USDT", "1h", "testexch", 10000.0,
+        )
+        assert result["engine"] == "native"
+
+
 # ── Backend Integration Tests ────────────────────────
 
 

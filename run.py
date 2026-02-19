@@ -365,12 +365,12 @@ def cmd_freqtrade(args):
 def cmd_nautilus(args):
     """NautilusTrader commands."""
     if args.nt_command == "test":
-        from nautilus.nautilus_runner import run_nautilus_backtest_example
-        engine = run_nautilus_backtest_example()
-        if engine:
+        from nautilus.nautilus_runner import run_nautilus_engine_test
+        success = run_nautilus_engine_test()
+        if success:
             print("✅ NautilusTrader engine initialized successfully")
         else:
-            print("❌ NautilusTrader engine failed to initialize")
+            print("❌ NautilusTrader engine not available (install with: pip install nautilus_trader)")
 
     elif args.nt_command == "convert":
         from nautilus.nautilus_runner import convert_ohlcv_to_nautilus_csv

@@ -191,7 +191,13 @@ export function DataManagement() {
       {/* Data Files Table */}
       <div className="mt-6 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
         <h3 className="mb-4 text-lg font-semibold">Available Data</h3>
-        {isLoading && <p className="text-sm text-[var(--color-text-muted)]">Loading...</p>}
+        {isLoading && (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-10 animate-pulse rounded bg-[var(--color-border)]" />
+            ))}
+          </div>
+        )}
         {files && files.length === 0 && (
           <p className="text-sm text-[var(--color-text-muted)]">
             No data files found. Use the download form or generate sample data.

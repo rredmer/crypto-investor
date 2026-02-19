@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { useApi } from "../hooks/useApi";
 import { exchangesApi } from "../api/exchanges";
 import { portfoliosApi } from "../api/portfolios";
 import { platformApi } from "../api/platform";
@@ -16,8 +15,14 @@ import type {
 } from "../types";
 
 export function Dashboard() {
-  const exchanges = useApi<ExchangeInfo[]>(["exchanges"], exchangesApi.list);
-  const portfolios = useApi<Portfolio[]>(["portfolios"], portfoliosApi.list);
+  const exchanges = useQuery<ExchangeInfo[]>({
+    queryKey: ["exchanges"],
+    queryFn: exchangesApi.list,
+  });
+  const portfolios = useQuery<Portfolio[]>({
+    queryKey: ["portfolios"],
+    queryFn: portfoliosApi.list,
+  });
 
   const { data: platformStatus } = useQuery<PlatformStatus>({
     queryKey: ["platform-status"],
@@ -242,8 +247,9 @@ function SummaryCard({
           <span className="h-2 w-2 animate-pulse rounded-full bg-blue-400" />
         )}
       </div>
-      {loading && <p className="text-sm">Loading...</p>}
-      {text ? (
+      {loading ? (
+        <div className="h-8 w-16 animate-pulse rounded bg-[var(--color-border)]" />
+      ) : text ? (
         <p className={`text-2xl font-bold ${textColor}`}>{text}</p>
       ) : (
         <p className="text-2xl font-bold">{value ?? 0}</p>

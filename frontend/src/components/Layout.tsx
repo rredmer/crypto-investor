@@ -37,7 +37,7 @@ interface LayoutProps {
 }
 
 export function Layout({ onLogout, username }: LayoutProps) {
-  const { isHalted, haltReason } = useSystemEvents();
+  const { isConnected, isHalted, haltReason } = useSystemEvents();
 
   return (
     <div className="flex h-screen">
@@ -67,6 +67,15 @@ export function Layout({ onLogout, username }: LayoutProps) {
         </ul>
         <EmergencyStopButton isHalted={isHalted} />
         <div className="mt-auto border-t border-[var(--color-border)] pt-4">
+          <div className="mb-2 flex items-center gap-2 px-3">
+            <span
+              className={`h-2 w-2 rounded-full ${isConnected ? "bg-green-400" : "bg-red-400"}`}
+              title={isConnected ? "WebSocket connected" : "WebSocket disconnected"}
+            />
+            <span className="text-xs text-[var(--color-text-muted)]">
+              {isConnected ? "Connected" : "Disconnected"}
+            </span>
+          </div>
           {username && (
             <p className="mb-2 truncate px-3 text-xs text-[var(--color-text-muted)]">
               {username}
