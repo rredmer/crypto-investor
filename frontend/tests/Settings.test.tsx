@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { screen } from "@testing-library/react";
+import { screen, fireEvent } from "@testing-library/react";
 import { Settings } from "../src/pages/Settings";
 import { renderWithProviders, mockFetch } from "./helpers";
 
@@ -43,17 +43,19 @@ const mockNotifPrefs = {
   on_daily_summary: false,
 };
 
+function setupMocks() {
+  vi.stubGlobal(
+    "fetch",
+    mockFetch({
+      "/api/exchange-configs": mockConfigs,
+      "/api/data-sources": mockDataSources,
+      "/api/notifications/preferences": mockNotifPrefs,
+    }),
+  );
+}
+
 describe("Settings Page", () => {
-  beforeEach(() => {
-    vi.stubGlobal(
-      "fetch",
-      mockFetch({
-        "/api/exchange-configs": mockConfigs,
-        "/api/data-sources": mockDataSources,
-        "/api/notifications/preferences": mockNotifPrefs,
-      }),
-    );
-  });
+  beforeEach(setupMocks);
 
   it("renders the page heading", () => {
     renderWithProviders(<Settings />);
@@ -67,7 +69,6 @@ describe("Settings Page", () => {
 
   it("renders exchange config card", async () => {
     renderWithProviders(<Settings />);
-    // "Binance Main" appears in both exchange config and data source sections
     const names = await screen.findAllByText("Binance Main");
     expect(names.length).toBeGreaterThanOrEqual(1);
     expect(await screen.findByText("binance")).toBeInTheDocument();
@@ -103,5 +104,182 @@ describe("Settings Page", () => {
     renderWithProviders(<Settings />);
     expect(screen.getByText("About")).toBeInTheDocument();
     expect(screen.getByText("crypto-investor v0.1.0")).toBeInTheDocument();
+  });
+});
+
+describe("Settings - Add Exchange Flow", () => {
+  beforeEach(setupMocks);
+
+  it("shows Add Exchange button initially", async () => {
+    renderWithProviders(<Settings />);
+    expect(await screen.findByText("Add Exchange")).toBeInTheDocument();
+  });
+
+  it("shows exchange form when Add Exchange is clicked", async () => {
+    renderWithProviders(<Settings />);
+    const addBtn = await screen.findByText("Add Exchange");
+    fireEvent.click(addBtn);
+    // Form should appear with Name and Exchange fields
+    expect(screen.getByText("Name")).toBeInTheDocument();
+    expect(screen.getByText("API Key")).toBeInTheDocument();
+    expect(screen.getByText("API Secret")).toBeInTheDocument();
+    expect(screen.getByText("Sandbox mode")).toBeInTheDocument();
+  });
+
+  it("hides Add Exchange button when form is open", async () => {
+    renderWithProviders(<Settings />);
+    const addBtn = await screen.findByText("Add Exchange");
+    fireEvent.click(addBtn);
+    // The "Add Exchange" button in the header should be gone
+    // but the form submit button says "Add Exchange" too
+    const addBtns = screen.queryAllByText("Add Exchange");
+    // Only the form submit button should remain
+    expect(addBtns.length).toBe(1);
+  });
+
+  it("shows Cancel button in add form", async () => {
+    renderWithProviders(<Settings />);
+    const addBtn = await screen.findByText("Add Exchange");
+    fireEvent.click(addBtn);
+    const cancelBtns = screen.getAllByText("Cancel");
+    expect(cancelBtns.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("closes form when Cancel is clicked", async () => {
+    renderWithProviders(<Settings />);
+    const addBtn = await screen.findByText("Add Exchange");
+    fireEvent.click(addBtn);
+    expect(screen.getByText("API Key")).toBeInTheDocument();
+    const cancelBtns = screen.getAllByText("Cancel");
+    fireEvent.click(cancelBtns[0]);
+    // Form should close, Add Exchange button should return in header
+    expect(screen.queryByText("API Key")).not.toBeInTheDocument();
+  });
+});
+
+describe("Settings - Edit and Delete Flow", () => {
+  beforeEach(setupMocks);
+
+  it("shows Edit button on config card", async () => {
+    renderWithProviders(<Settings />);
+    expect(await screen.findByText("Edit")).toBeInTheDocument();
+  });
+
+  it("shows edit form when Edit is clicked", async () => {
+    renderWithProviders(<Settings />);
+    const editBtn = await screen.findByText("Edit");
+    fireEvent.click(editBtn);
+    expect(screen.getByText("API Key")).toBeInTheDocument();
+    expect(screen.getByText("Update")).toBeInTheDocument();
+  });
+
+  it("shows Delete buttons on config and data source cards", async () => {
+    renderWithProviders(<Settings />);
+    // Delete appears on both exchange config card and data source card
+    const deleteBtns = await screen.findAllByText("Delete");
+    expect(deleteBtns.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("shows Confirm and No buttons after Delete click on exchange config", async () => {
+    renderWithProviders(<Settings />);
+    const deleteBtns = await screen.findAllByText("Delete");
+    // First Delete button is on the exchange config card
+    fireEvent.click(deleteBtns[0]);
+    expect(screen.getByText("Confirm")).toBeInTheDocument();
+    expect(screen.getByText("No")).toBeInTheDocument();
+  });
+
+  it("cancels delete when No is clicked", async () => {
+    renderWithProviders(<Settings />);
+    const deleteBtns = await screen.findAllByText("Delete");
+    fireEvent.click(deleteBtns[0]);
+    fireEvent.click(screen.getByText("No"));
+    // Should go back to normal state with Delete buttons
+    const afterBtns = await screen.findAllByText("Delete");
+    expect(afterBtns.length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByText("Confirm")).not.toBeInTheDocument();
+  });
+});
+
+describe("Settings - Test Connection", () => {
+  beforeEach(setupMocks);
+
+  it("shows Test button on config card", async () => {
+    renderWithProviders(<Settings />);
+    expect(await screen.findByText("Test")).toBeInTheDocument();
+  });
+
+  it("shows Testing... state while test is running", async () => {
+    renderWithProviders(<Settings />);
+    const testBtn = await screen.findByText("Test");
+    fireEvent.click(testBtn);
+    expect(screen.getByText("Testing...")).toBeInTheDocument();
+  });
+});
+
+describe("Settings - Connection Status", () => {
+  it("shows green dot for successful connection", async () => {
+    setupMocks();
+    renderWithProviders(<Settings />);
+    const dot = await screen.findByTitle("Connected");
+    expect(dot).toBeInTheDocument();
+  });
+
+  it("shows gray dot for untested connection", async () => {
+    vi.stubGlobal(
+      "fetch",
+      mockFetch({
+        "/api/exchange-configs": [
+          { ...mockConfigs[0], last_test_success: null },
+        ],
+        "/api/data-sources": mockDataSources,
+        "/api/notifications/preferences": mockNotifPrefs,
+      }),
+    );
+    renderWithProviders(<Settings />);
+    const dot = await screen.findByTitle("Not tested");
+    expect(dot).toBeInTheDocument();
+  });
+
+  it("shows red dot for failed connection", async () => {
+    vi.stubGlobal(
+      "fetch",
+      mockFetch({
+        "/api/exchange-configs": [
+          { ...mockConfigs[0], last_test_success: false, last_test_error: "Auth failed" },
+        ],
+        "/api/data-sources": mockDataSources,
+        "/api/notifications/preferences": mockNotifPrefs,
+      }),
+    );
+    renderWithProviders(<Settings />);
+    const dot = await screen.findByTitle("Auth failed");
+    expect(dot).toBeInTheDocument();
+  });
+});
+
+describe("Settings - Masked API Key", () => {
+  beforeEach(setupMocks);
+
+  it("shows masked API key on config card", async () => {
+    renderWithProviders(<Settings />);
+    expect(await screen.findByText("Key: abc...xyz")).toBeInTheDocument();
+  });
+});
+
+describe("Settings - Empty State", () => {
+  it("shows empty message when no configs exist", async () => {
+    vi.stubGlobal(
+      "fetch",
+      mockFetch({
+        "/api/exchange-configs": [],
+        "/api/data-sources": [],
+        "/api/notifications/preferences": mockNotifPrefs,
+      }),
+    );
+    renderWithProviders(<Settings />);
+    expect(
+      await screen.findByText(/No exchange connections configured/),
+    ).toBeInTheDocument();
   });
 });
