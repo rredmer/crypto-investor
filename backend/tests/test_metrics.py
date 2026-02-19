@@ -8,32 +8,28 @@ from django.test import Client
 
 @pytest.mark.django_db
 class TestMetricsEndpoint:
-    def test_metrics_returns_200(self):
-        client = Client()
-        resp = client.get("/metrics/")
+    def test_metrics_returns_200(self, authenticated_client):
+        resp = authenticated_client.get("/metrics/")
         assert resp.status_code == 200
         assert resp["Content-Type"].startswith("text/plain")
 
-    def test_metrics_no_auth_required(self):
-        """Metrics endpoint should be accessible without authentication."""
+    def test_metrics_requires_auth(self):
+        """Metrics endpoint should require authentication."""
         client = Client()
         resp = client.get("/metrics/")
-        assert resp.status_code == 200
+        assert resp.status_code == 403
 
-    def test_metrics_contains_gauges(self):
+    def test_metrics_contains_gauges(self, authenticated_client):
         """After hitting metrics, we should see active_orders gauges."""
-        client = Client()
-        resp = client.get("/metrics/")
+        resp = authenticated_client.get("/metrics/")
         body = resp.content.decode()
         assert "active_orders" in body
 
     def test_metrics_after_request(self, authenticated_client):
         """After a real request, http_requests_total should increment."""
-        # Make a request to generate metrics
         authenticated_client.get("/api/health/")
 
-        client = Client()
-        resp = client.get("/metrics/")
+        resp = authenticated_client.get("/metrics/")
         body = resp.content.decode()
         assert "http_requests_total" in body
         assert "http_request_duration_seconds" in body

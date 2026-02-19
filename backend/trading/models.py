@@ -72,6 +72,7 @@ class Order(models.Model):
         max_length=10,
         choices=TradingMode.choices,
         default=TradingMode.PAPER,
+        db_index=True,
     )
     portfolio_id = models.IntegerField(default=1)
     avg_fill_price = models.FloatField(default=0.0)

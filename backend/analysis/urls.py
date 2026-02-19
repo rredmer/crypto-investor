@@ -13,6 +13,10 @@ from analysis.views import (
     JobCancelView,
     JobDetailView,
     JobListView,
+    MLModelDetailView,
+    MLModelListView,
+    MLPredictView,
+    MLTrainView,
     ScreeningResultDetailView,
     ScreeningResultListView,
     ScreeningRunView,
@@ -51,4 +55,9 @@ urlpatterns = [
     ),
     path("data/download/", DataDownloadView.as_view(), name="data-download"),
     path("data/generate-sample/", DataGenerateSampleView.as_view(), name="data-generate-sample"),
+    # ML
+    path("ml/train/", MLTrainView.as_view(), name="ml-train"),
+    path("ml/models/", MLModelListView.as_view(), name="ml-model-list"),
+    path("ml/models/<str:model_id>/", MLModelDetailView.as_view(), name="ml-model-detail"),
+    path("ml/predict/", MLPredictView.as_view(), name="ml-predict"),
 ]

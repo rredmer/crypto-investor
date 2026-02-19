@@ -10,6 +10,16 @@ from trading.models import Order, OrderStatus, TradingMode
 from trading.serializers import OrderCreateSerializer, OrderSerializer
 
 
+def _safe_int(value: str | None, default: int, min_val: int = 1, max_val: int = 1000) -> int:
+    """Safely convert a query parameter to int with bounds."""
+    if value is None:
+        return default
+    try:
+        return max(min_val, min(int(value), max_val))
+    except (ValueError, TypeError):
+        return default
+
+
 class OrderListView(APIView):
     def get(self, request: Request) -> Response:
         limit = int(request.query_params.get("limit", 50))
@@ -94,7 +104,7 @@ class LiveTradingStatusView(APIView):
         from market.services.exchange import ExchangeService
         from risk.models import RiskState
 
-        portfolio_id = int(request.query_params.get("portfolio_id", 1))
+        portfolio_id = _safe_int(request.query_params.get("portfolio_id"), 1)
 
         state = RiskState.objects.filter(portfolio_id=portfolio_id).first()
         is_halted = state.is_halted if state else False
@@ -158,7 +168,7 @@ class PaperTradingTradesView(APIView):
 
 class PaperTradingHistoryView(APIView):
     def get(self, request: Request) -> Response:
-        limit = int(request.query_params.get("limit", 50))
+        limit = _safe_int(request.query_params.get("limit"), 50, max_val=200)
         service = _get_paper_trading_service()
         return Response(async_to_sync(service.get_trade_history)(limit))
 
@@ -183,7 +193,7 @@ class PaperTradingBalanceView(APIView):
 
 class PaperTradingLogView(APIView):
     def get(self, request: Request) -> Response:
-        limit = int(request.query_params.get("limit", 100))
+        limit = _safe_int(request.query_params.get("limit"), 100, max_val=500)
         service = _get_paper_trading_service()
         return Response(service.get_log_entries(limit))
 

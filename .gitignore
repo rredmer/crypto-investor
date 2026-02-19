@@ -1,3 +1,6 @@
+# ML model storage
+models/
+
 # Python
 __pycache__/
 *.py[cod]

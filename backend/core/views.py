@@ -84,7 +84,6 @@ class NotificationPreferencesView(APIView):
 
 
 class MetricsView(APIView):
-    permission_classes = [AllowAny]
 
     def get(self, request: Request) -> HttpResponse:
         from core.services.metrics import metrics

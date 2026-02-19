@@ -16,6 +16,11 @@ RUN mkdir -p /app/data/logs
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
+# Create non-root user and set ownership
+RUN groupadd -r appuser && useradd -r -g appuser -d /app appuser && \
+    chown -R appuser:appuser /app
+USER appuser
+
 EXPOSE 8000
 
 ENTRYPOINT ["/docker-entrypoint.sh"]

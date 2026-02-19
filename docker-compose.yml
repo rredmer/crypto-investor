@@ -6,10 +6,10 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DJANGO_SECRET_KEY: docker-dev-secret-key-not-for-production
-      DJANGO_DEBUG: "true"
-      DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1,0.0.0.0,backend"
-      DJANGO_ENCRYPTION_KEY: "${DJANGO_ENCRYPTION_KEY:-TepMz4I9BrtjZvZ7sH6fVVB2iuW568_UVGBFg189xls=}"
+      DJANGO_SECRET_KEY: "${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY in .env}"
+      DJANGO_DEBUG: "${DJANGO_DEBUG:-false}"
+      DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1,backend"
+      DJANGO_ENCRYPTION_KEY: "${DJANGO_ENCRYPTION_KEY:?Set DJANGO_ENCRYPTION_KEY in .env}"
       CORS_ALLOWED_ORIGINS: "http://localhost:3000,http://localhost:5173"
       CSRF_TRUSTED_ORIGINS: "http://localhost:3000,http://localhost:5173,http://localhost:8000"
       EXCHANGE_ID: "${EXCHANGE_ID:-binance}"

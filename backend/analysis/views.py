@@ -16,10 +16,20 @@ from analysis.serializers import (
 )
 
 
+def _safe_int(value: str | None, default: int, min_val: int = 1, max_val: int = 1000) -> int:
+    """Safely convert a query parameter to int with bounds."""
+    if value is None:
+        return default
+    try:
+        return max(min_val, min(int(value), max_val))
+    except (ValueError, TypeError):
+        return default
+
+
 class JobListView(APIView):
     def get(self, request: Request) -> Response:
         job_type = request.query_params.get("job_type")
-        limit = int(request.query_params.get("limit", 50))
+        limit = _safe_int(request.query_params.get("limit"), 50, max_val=200)
         qs = BackgroundJob.objects.all()
         if job_type:
             qs = qs.filter(job_type=job_type)
@@ -79,7 +89,7 @@ class BacktestRunView(APIView):
 
 class BacktestResultListView(APIView):
     def get(self, request: Request) -> Response:
-        limit = int(request.query_params.get("limit", 20))
+        limit = _safe_int(request.query_params.get("limit"), 20, max_val=100)
         results = BacktestResult.objects.select_related("job").all()[:limit]
         return Response(BacktestResultSerializer(results, many=True).data)
 
@@ -106,7 +116,11 @@ class BacktestStrategyListView(APIView):
 class BacktestCompareView(APIView):
     def get(self, request: Request) -> Response:
         ids_param = request.query_params.get("ids", "")
-        id_list = [int(x) for x in ids_param.split(",") if x.strip()]
+        id_list = []
+        for x in ids_param.split(","):
+            x = x.strip()
+            if x.isdigit():
+                id_list.append(int(x))
         results = BacktestResult.objects.select_related("job").filter(id__in=id_list)
         return Response(BacktestResultSerializer(results, many=True).data)
 
@@ -132,7 +146,7 @@ class ScreeningRunView(APIView):
 
 class ScreeningResultListView(APIView):
     def get(self, request: Request) -> Response:
-        limit = int(request.query_params.get("limit", 20))
+        limit = _safe_int(request.query_params.get("limit"), 20, max_val=100)
         results = ScreenResult.objects.select_related("job").all()[:limit]
         return Response(ScreenResultSerializer(results, many=True).data)
 
@@ -209,3 +223,57 @@ class DataGenerateSampleView(APIView):
             {"job_id": job_id, "status": "accepted"},
             status=status.HTTP_202_ACCEPTED,
         )
+
+
+# ──────────────────────────────────────────────
+# ML endpoints
+# ──────────────────────────────────────────────
+
+
+class MLTrainView(APIView):
+    def post(self, request: Request) -> Response:
+        from analysis.serializers import MLTrainRequestSerializer
+        from analysis.services.job_runner import get_job_runner
+        from analysis.services.ml import MLService
+
+        ser = MLTrainRequestSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        job_id = get_job_runner().submit(
+            job_type="ml_train",
+            run_fn=MLService.train,
+            params=ser.validated_data,
+        )
+        return Response(
+            {"job_id": job_id, "status": "accepted"},
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+
+class MLModelListView(APIView):
+    def get(self, request: Request) -> Response:
+        from analysis.services.ml import MLService
+
+        return Response(MLService.list_models())
+
+
+class MLModelDetailView(APIView):
+    def get(self, request: Request, model_id: str) -> Response:
+        from analysis.services.ml import MLService
+
+        detail = MLService.get_model_detail(model_id)
+        if detail is None:
+            return Response({"error": "Model not found"}, status=status.HTTP_404_NOT_FOUND)
+        return Response(detail)
+
+
+class MLPredictView(APIView):
+    def post(self, request: Request) -> Response:
+        from analysis.serializers import MLPredictRequestSerializer
+        from analysis.services.ml import MLService
+
+        ser = MLPredictRequestSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        result = MLService.predict(ser.validated_data)
+        if "error" in result:
+            return Response(result, status=status.HTTP_400_BAD_REQUEST)
+        return Response(result)

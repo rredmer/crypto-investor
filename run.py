@@ -8,6 +8,7 @@ Master CLI that coordinates all framework tiers:
     - Freqtrade (crypto backtesting & live trading)
     - NautilusTrader (multi-asset execution)
     - hftbacktest (HFT simulation)
+    - ML Pipeline (feature engineering, training, prediction)
     - Risk Management (global position/drawdown limits)
 
 Usage:
@@ -22,6 +23,9 @@ Usage:
     python run.py nautilus list-strategies   # List Nautilus strategies
     python run.py hft backtest              # Run HFT backtest
     python run.py hft list-strategies       # List HFT strategies
+    python run.py ml train                  # Train ML model
+    python run.py ml list-models            # List trained models
+    python run.py ml predict                # Run prediction
     python run.py validate                   # Validate all framework installs
 """
 
@@ -154,6 +158,9 @@ def cmd_validate():
         ("ccxt", "import ccxt; e = ccxt.binance(); print(f'CCXT Binance: OK, {len(e.describe()[\"api\"])} API groups')"),
         ("pandas+numpy", "import pandas as pd; import numpy as np; print(f'Pandas {pd.__version__}, NumPy {np.__version__}: OK')"),
         ("talib", "import talib; print(f'TA-Lib functions: {len(talib.get_functions())} available')"),
+        ("ml_features", "from common.ml.features import build_feature_matrix; print('ML features: OK')"),
+        ("ml_trainer", "from common.ml.trainer import HAS_LIGHTGBM; print(f'ML trainer: OK (lightgbm={HAS_LIGHTGBM})')"),
+        ("ml_registry", "from common.ml.registry import ModelRegistry; print('ML registry: OK')"),
         ("indicators", "from common.indicators.technical import add_all_indicators; print('Shared indicators: OK')"),
         ("data_pipeline", "from common.data_pipeline.pipeline import fetch_ohlcv, load_ohlcv; print('Data pipeline: OK')"),
         ("risk_manager", "from common.risk.risk_manager import RiskManager; rm = RiskManager(); print(f'Risk manager: OK, limits={rm.limits}')"),
@@ -387,6 +394,123 @@ def cmd_nautilus(args):
         print("Usage: python run.py nautilus {test|convert|backtest|list-strategies}")
 
 
+def cmd_ml(args):
+    """ML pipeline commands."""
+    if args.ml_command == "train":
+        from common.ml.features import build_feature_matrix
+        from common.ml.registry import ModelRegistry
+        from common.ml.trainer import train_model
+        from common.data_pipeline.pipeline import load_ohlcv
+
+        symbol = args.symbol
+        timeframe = args.timeframe
+        exchange = args.exchange
+
+        print(f"Loading data: {symbol} {timeframe} ({exchange})...")
+        df = load_ohlcv(symbol, timeframe, exchange)
+        if df.empty:
+            print(f"❌ No data for {symbol} {timeframe}. Run: python run.py data generate-sample")
+            return
+
+        print(f"Building features from {len(df)} bars...")
+        x_feat, y_target, feature_names = build_feature_matrix(df)
+        print(f"Feature matrix: {len(x_feat)} rows x {len(feature_names)} features")
+
+        if len(x_feat) < 100:
+            print(f"❌ Insufficient data: {len(x_feat)} rows (need >= 100)")
+            return
+
+        print("Training LightGBM model...")
+        result = train_model(x_feat, y_target, feature_names, test_ratio=args.test_ratio)
+
+        registry = ModelRegistry()
+        model_id = registry.save_model(
+            model=result["model"],
+            metrics=result["metrics"],
+            metadata=result["metadata"],
+            feature_importance=result["feature_importance"],
+            symbol=symbol,
+            timeframe=timeframe,
+        )
+
+        print(f"\n✅ Model trained and saved: {model_id}")
+        print(f"  Accuracy:  {result['metrics']['accuracy']:.4f}")
+        print(f"  Precision: {result['metrics']['precision']:.4f}")
+        print(f"  F1 Score:  {result['metrics']['f1']:.4f}")
+        print(f"  Log Loss:  {result['metrics']['logloss']:.6f}")
+
+        # Show top features
+        top = sorted(result["feature_importance"].items(), key=lambda x: x[1], reverse=True)[:5]
+        print("\n  Top features:")
+        for name, score in top:
+            print(f"    {name}: {score:.0f}")
+
+    elif args.ml_command == "list-models":
+        from common.ml.registry import ModelRegistry
+
+        registry = ModelRegistry()
+        models = registry.list_models()
+        if not models:
+            print("No trained models found. Run: python run.py ml train")
+            return
+
+        print(f"\n{'Model ID':<40} {'Symbol':<12} {'TF':<6} {'Acc':<8} {'F1':<8} {'Created'}")
+        print("-" * 90)
+        for m in models:
+            metrics = m.get("metrics", {})
+            print(
+                f"{m['model_id']:<40} {m.get('symbol', ''):<12} {m.get('timeframe', ''):<6} "
+                f"{metrics.get('accuracy', 0):<8.4f} {metrics.get('f1', 0):<8.4f} "
+                f"{m.get('created_at', '')[:19]}"
+            )
+
+    elif args.ml_command == "predict":
+        from common.ml.features import build_feature_matrix
+        from common.ml.registry import ModelRegistry
+        from common.ml.trainer import predict
+        from common.data_pipeline.pipeline import load_ohlcv
+
+        model_id = args.model_id
+        if not model_id:
+            # Use latest model
+            registry = ModelRegistry()
+            models = registry.list_models()
+            if not models:
+                print("❌ No models found. Run: python run.py ml train")
+                return
+            model_id = models[0]["model_id"]
+            print(f"Using latest model: {model_id}")
+
+        registry = ModelRegistry()
+        try:
+            model, manifest = registry.load_model(model_id)
+        except FileNotFoundError:
+            print(f"❌ Model not found: {model_id}")
+            return
+
+        symbol = args.symbol
+        timeframe = args.timeframe
+        exchange = args.exchange
+
+        df = load_ohlcv(symbol, timeframe, exchange)
+        if df.empty:
+            print(f"❌ No data for {symbol} {timeframe}")
+            return
+
+        x_feat, _y, _names = build_feature_matrix(df)
+        x_recent = x_feat.tail(args.bars)
+
+        result = predict(model, x_recent)
+        print(f"\nPrediction ({model_id}):")
+        print(f"  Symbol:       {symbol} {timeframe}")
+        print(f"  Bars:         {result['n_bars']}")
+        print(f"  Mean P(up):   {result['mean_probability']:.4f}")
+        print(f"  Predicted up: {result['predicted_up_pct']:.1f}%")
+
+    else:
+        print("Usage: python run.py ml {train|list-models|predict}")
+
+
 def cmd_hft(args):
     """hftbacktest commands."""
     if args.hft_command == "backtest":
@@ -437,6 +561,9 @@ Examples:
   python run.py nautilus list-strategies
   python run.py hft backtest --strategy MarketMaker
   python run.py hft list-strategies
+  python run.py ml train --symbol BTC/USDT
+  python run.py ml list-models
+  python run.py ml predict --model-id <id>
         """,
     )
     sub = parser.add_subparsers(dest="command")
@@ -500,6 +627,22 @@ Examples:
     nt_bt.add_argument("--balance", type=float, default=10000.0)
     nt_sub.add_parser("list-strategies", help="List registered strategies")
 
+    # ML pipeline
+    ml_parser = sub.add_parser("ml", help="ML pipeline commands")
+    ml_sub = ml_parser.add_subparsers(dest="ml_command")
+    ml_train = ml_sub.add_parser("train", help="Train ML model")
+    ml_train.add_argument("--symbol", default="BTC/USDT")
+    ml_train.add_argument("--timeframe", default="1h")
+    ml_train.add_argument("--exchange", default="binance")
+    ml_train.add_argument("--test-ratio", type=float, default=0.2)
+    ml_sub.add_parser("list-models", help="List trained models")
+    ml_pred = ml_sub.add_parser("predict", help="Run prediction")
+    ml_pred.add_argument("--model-id", default="", dest="model_id")
+    ml_pred.add_argument("--symbol", default="BTC/USDT")
+    ml_pred.add_argument("--timeframe", default="1h")
+    ml_pred.add_argument("--exchange", default="binance")
+    ml_pred.add_argument("--bars", type=int, default=50)
+
     # hftbacktest
     hft_parser = sub.add_parser("hft", help="hftbacktest commands")
     hft_sub = hft_parser.add_subparsers(dest="hft_command")
@@ -531,6 +674,8 @@ Examples:
         cmd_freqtrade(args)
     elif args.command == "nautilus":
         cmd_nautilus(args)
+    elif args.command == "ml":
+        cmd_ml(args)
     elif args.command == "hft":
         cmd_hft(args)
     else:

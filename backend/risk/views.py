@@ -1,10 +1,21 @@
 """Risk management views."""
 
+from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from risk.services.risk import RiskManagementService
+
+
+def _safe_int(value: str | None, default: int, min_val: int = 1, max_val: int = 1000) -> int:
+    """Safely convert a query parameter to int with bounds."""
+    if value is None:
+        return default
+    try:
+        return max(min_val, min(int(value), max_val))
+    except (ValueError, TypeError):
+        return default
 
 
 class RiskStatusView(APIView):
@@ -31,7 +42,16 @@ class RiskLimitsView(APIView):
 
 class EquityUpdateView(APIView):
     def post(self, request: Request, portfolio_id: int) -> Response:
-        equity = float(request.data.get("equity", 0))
+        try:
+            equity = float(request.data.get("equity", 0))
+        except (ValueError, TypeError):
+            return Response(
+                {"error": "Invalid equity value"}, status=status.HTTP_400_BAD_REQUEST
+            )
+        if equity < 0:
+            return Response(
+                {"error": "Equity must be non-negative"}, status=status.HTTP_400_BAD_REQUEST
+            )
         return Response(RiskManagementService.update_equity(portfolio_id, equity))
 
 
@@ -81,7 +101,7 @@ class MetricHistoryView(APIView):
     def get(self, request: Request, portfolio_id: int) -> Response:
         from risk.serializers import RiskMetricHistorySerializer
 
-        hours = int(request.query_params.get("hours", 168))
+        hours = _safe_int(request.query_params.get("hours"), 168, min_val=1, max_val=8760)
         entries = RiskManagementService.get_metric_history(portfolio_id, hours)
         return Response(RiskMetricHistorySerializer(entries, many=True).data)
 
@@ -120,7 +140,7 @@ class AlertListView(APIView):
     def get(self, request: Request, portfolio_id: int) -> Response:
         from risk.serializers import AlertLogSerializer
 
-        limit = int(request.query_params.get("limit", 50))
+        limit = _safe_int(request.query_params.get("limit"), 50, max_val=200)
         alerts = RiskManagementService.get_alerts(portfolio_id, limit)
         return Response(AlertLogSerializer(alerts, many=True).data)
 
@@ -129,6 +149,6 @@ class TradeLogView(APIView):
     def get(self, request: Request, portfolio_id: int) -> Response:
         from risk.serializers import TradeCheckLogSerializer
 
-        limit = int(request.query_params.get("limit", 50))
+        limit = _safe_int(request.query_params.get("limit"), 50, max_val=200)
         logs = RiskManagementService.get_trade_log(portfolio_id, limit)
         return Response(TradeCheckLogSerializer(logs, many=True).data)

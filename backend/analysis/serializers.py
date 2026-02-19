@@ -109,3 +109,18 @@ class PaperTradingActionSerializer(serializers.Serializer):
     pid = serializers.IntegerField(allow_null=True, required=False)
     started_at = serializers.CharField(allow_null=True, required=False)
     error = serializers.CharField(allow_null=True, required=False)
+
+
+class MLTrainRequestSerializer(serializers.Serializer):
+    symbol = serializers.CharField(default="BTC/USDT")
+    timeframe = serializers.CharField(default="1h")
+    exchange = serializers.CharField(default="binance")
+    test_ratio = serializers.FloatField(default=0.2, min_value=0.05, max_value=0.5)
+
+
+class MLPredictRequestSerializer(serializers.Serializer):
+    model_id = serializers.CharField()
+    symbol = serializers.CharField(default="BTC/USDT")
+    timeframe = serializers.CharField(default="1h")
+    exchange = serializers.CharField(default="binance")
+    bars = serializers.IntegerField(default=50, min_value=1, max_value=1000)

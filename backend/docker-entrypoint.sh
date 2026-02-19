@@ -4,17 +4,14 @@ set -e
 echo "→ Running migrations..."
 python manage.py migrate --run-syncdb
 
-echo "→ Creating admin user (if needed)..."
-python manage.py shell -c "
-from django.contrib.auth.models import User
-u, created = User.objects.get_or_create(username='admin', defaults={'is_superuser': True, 'is_staff': True})
-if created:
-    u.set_password('admin')
-    u.save()
-    print('Created admin user')
-else:
-    print('Admin user exists')
-" 2>/dev/null || true
+if [ -n "$DJANGO_SUPERUSER_PASSWORD" ]; then
+    echo "→ Creating superuser from env (if needed)..."
+    python manage.py createsuperuser --noinput \
+        --username "${DJANGO_SUPERUSER_USERNAME:-admin}" \
+        --email "${DJANGO_SUPERUSER_EMAIL:-admin@localhost}" 2>/dev/null || true
+else
+    echo "→ Skipping superuser creation (set DJANGO_SUPERUSER_PASSWORD to enable)"
+fi
 
 echo "→ Starting Daphne..."
 exec "$@"

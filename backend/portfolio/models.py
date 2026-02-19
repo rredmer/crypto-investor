@@ -19,11 +19,19 @@ class Holding(models.Model):
     portfolio = models.ForeignKey(
         Portfolio, on_delete=models.CASCADE, related_name="holdings"
     )
-    symbol = models.CharField(max_length=20)
+    symbol = models.CharField(max_length=20, db_index=True)
     amount = models.FloatField(default=0.0)
     avg_buy_price = models.FloatField(default=0.0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["portfolio", "symbol"],
+                name="idx_holding_portfolio_symbol",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.symbol} x{self.amount}"
