@@ -170,6 +170,15 @@ def run_nautilus_backtest(
     trades_df = strategy.get_trades_df()
     metrics = compute_performance_metrics(trades_df)
 
+    # Serialize trades for JSON storage (Django JSONField, result files)
+    trades_list = []
+    if not trades_df.empty:
+        trades_serial = trades_df.copy()
+        for col in ["entry_time", "exit_time"]:
+            if col in trades_serial.columns:
+                trades_serial[col] = trades_serial[col].astype(str)
+        trades_list = trades_serial.to_dict("records")
+
     result = {
         "framework": "nautilus",
         "strategy": strategy_name,
@@ -179,6 +188,7 @@ def run_nautilus_backtest(
         "initial_balance": initial_balance,
         "bars_processed": len(df),
         "metrics": metrics,
+        "trades": trades_list,
     }
 
     # Save to results dir

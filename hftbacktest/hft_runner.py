@@ -141,6 +141,15 @@ def run_hft_backtest(
     trades_df = strategy.get_trades_df()
     metrics = compute_performance_metrics(trades_df)
 
+    # Serialize trades for JSON storage (Django JSONField, result files)
+    trades_list = []
+    if not trades_df.empty:
+        trades_serial = trades_df.copy()
+        for col in ["entry_time", "exit_time"]:
+            if col in trades_serial.columns:
+                trades_serial[col] = trades_serial[col].astype(str)
+        trades_list = trades_serial.to_dict("records")
+
     result = {
         "framework": "hftbacktest",
         "strategy": strategy_name,
@@ -155,6 +164,7 @@ def run_hft_backtest(
         "gross_pnl": round(strategy.gross_pnl, 2),
         "total_fees": round(strategy.total_fees, 4),
         "metrics": metrics,
+        "trades": trades_list,
     }
 
     # Save results
