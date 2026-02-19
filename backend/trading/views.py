@@ -207,12 +207,15 @@ class PaperTradingLogView(APIView):
 
 # Singleton paper trading service
 _paper_trading_service = None
+_paper_trading_lock = __import__("threading").Lock()
 
 
 def _get_paper_trading_service():
     global _paper_trading_service
     if _paper_trading_service is None:
-        from trading.services.paper_trading import PaperTradingService
+        with _paper_trading_lock:
+            if _paper_trading_service is None:
+                from trading.services.paper_trading import PaperTradingService
 
-        _paper_trading_service = PaperTradingService()
+                _paper_trading_service = PaperTradingService()
     return _paper_trading_service

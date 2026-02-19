@@ -19,11 +19,15 @@ logger = logging.getLogger("auth")
 _failed_logins: dict[str, list[tuple[float, str]]] = {}
 
 
+_TRUSTED_PROXIES = {"127.0.0.1", "::1", "172.17.0.1"}
+
+
 def _get_client_ip(request: Request) -> str:
+    remote_addr = request.META.get("REMOTE_ADDR", "unknown")
     xff = request.META.get("HTTP_X_FORWARDED_FOR")
-    if xff:
+    if xff and remote_addr in _TRUSTED_PROXIES:
         return xff.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR", "unknown")
+    return remote_addr
 
 
 def _is_locked_out(ip: str) -> bool:

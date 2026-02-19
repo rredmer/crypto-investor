@@ -148,7 +148,7 @@ def _screen_rsi(df, vbt, fees: float):
                         "num_trades": pf.trades.count(),
                     })
                 except Exception:
-                    pass
+                    logger.debug("Skipped RSI combo", exc_info=True)
     df_r = pd.DataFrame(results)
     return df_r.sort_values("sharpe_ratio", ascending=False) if not df_r.empty else df_r
 
@@ -180,7 +180,7 @@ def _screen_bollinger(df, vbt, sma_fn, fees: float):
                     "num_trades": pf.trades.count(),
                 })
             except Exception:
-                pass
+                logger.debug("Skipped param combo", exc_info=True)
     df_r = pd.DataFrame(results)
     return df_r.sort_values("sharpe_ratio", ascending=False) if not df_r.empty else df_r
 
@@ -210,6 +210,6 @@ def _screen_ema_rsi(df, vbt, ema_fn, rsi_fn, fees: float):
                     "num_trades": pf.trades.count(),
                 })
             except Exception:
-                pass
+                logger.debug("Skipped param combo", exc_info=True)
     df_r = pd.DataFrame(results)
     return df_r.sort_values("sharpe_ratio", ascending=False) if not df_r.empty else df_r

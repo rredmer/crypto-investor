@@ -319,7 +319,14 @@ class IndicatorComputeView(APIView):
         future = _thread_pool.submit(
             IndicatorService.compute, real_symbol, timeframe, exchange, ind_list, limit
         )
-        return Response(future.result(timeout=30))
+        try:
+            return Response(future.result(timeout=30))
+        except TimeoutError:
+            future.cancel()
+            return Response(
+                {"error": "Indicator computation timed out after 30 seconds"},
+                status=status.HTTP_408_REQUEST_TIMEOUT,
+            )
 
 
 class RegimeCurrentAllView(APIView):
@@ -419,12 +426,15 @@ class RegimePositionSizeView(APIView):
 
 # Singleton regime service
 _regime_service = None
+_regime_service_lock = __import__("threading").Lock()
 
 
 def _get_regime_service():
     global _regime_service
     if _regime_service is None:
-        from market.services.regime import RegimeService
+        with _regime_service_lock:
+            if _regime_service is None:
+                from market.services.regime import RegimeService
 
-        _regime_service = RegimeService()
+                _regime_service = RegimeService()
     return _regime_service

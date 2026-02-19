@@ -36,6 +36,9 @@ Thumbs.db
 backend/data/*.db
 backend/data/*.db-wal
 backend/data/*.db-shm
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
 
 # Node
 node_modules/
@@ -85,6 +88,9 @@ backend/data/backups/
 
 # Django
 backend/db.sqlite3
+
+# Freqtrade runtime config (contains credentials — use config.json.example as template)
+freqtrade/config.json
 
 # Misc
 *.zip

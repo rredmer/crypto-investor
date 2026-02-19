@@ -116,11 +116,14 @@ class RateLimitMiddleware:
 
         return self.get_response(request)
 
+    _TRUSTED_PROXIES = {"127.0.0.1", "::1", "172.17.0.1"}
+
     def _get_ip(self, request) -> str:
+        remote_addr = request.META.get("REMOTE_ADDR", "unknown")
         xff = request.META.get("HTTP_X_FORWARDED_FOR")
-        if xff:
+        if xff and remote_addr in self._TRUSTED_PROXIES:
             return xff.split(",")[0].strip()
-        return request.META.get("REMOTE_ADDR", "unknown")
+        return remote_addr
 
     def _allow(self, key: str, limit: int) -> bool:
         now = time.time()

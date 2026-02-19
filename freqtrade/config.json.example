@@ -52,21 +52,7 @@
     "telegram": {
         "enabled": false,
         "token": "",
-        "chat_id": "",
-        "notification_settings": {
-            "status": "on",
-            "warning": "on",
-            "startup": "on",
-            "entry": "on",
-            "exit": "on",
-            "entry_cancel": "on",
-            "exit_cancel": "on",
-            "entry_fill": "off",
-            "exit_fill": "off",
-            "protection_trigger": "on",
-            "protection_trigger_global": "on",
-            "show_candle": "off"
-        }
+        "chat_id": ""
     },
     "api_server": {
         "enabled": true,
@@ -74,16 +60,15 @@
         "listen_port": 8080,
         "verbosity": "error",
         "enable_openapi": true,
-        "jwt_secret_key": "change_me_in_production",
+        "jwt_secret_key": "CHANGE_ME_GENERATE_WITH_openssl_rand_hex_32",
         "CORS_origins": ["http://localhost:3000"],
-        "username": "freqtrader",
-        "password": "freqtrader"
+        "username": "CHANGE_ME",
+        "password": "CHANGE_ME"
     },
     "bot_name": "crypto-investor-ft",
     "initial_state": "running",
     "force_entry_enable": false,
     "internals": {
         "process_throttle_secs": 5
-    },
-    "user_data_dir": "/home/rredmer/Dev/crypto-investor/freqtrade/user_data"
+    }
 }

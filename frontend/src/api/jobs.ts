@@ -4,7 +4,7 @@ import type { BackgroundJob } from "../types";
 export const jobsApi = {
   list: (type?: string, limit?: number) => {
     const params = new URLSearchParams();
-    if (type) params.set("type", type);
+    if (type) params.set("job_type", type);
     if (limit) params.set("limit", String(limit));
     const qs = params.toString();
     return api.get<BackgroundJob[]>(`/jobs/${qs ? `?${qs}` : ""}`);

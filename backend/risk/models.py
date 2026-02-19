@@ -46,6 +46,12 @@ class RiskMetricHistory(models.Model):
 
     class Meta:
         ordering = ["-recorded_at"]
+        indexes = [
+            models.Index(
+                fields=["portfolio_id", "recorded_at"],
+                name="idx_risk_metric_portfolio_time",
+            ),
+        ]
 
 
 class TradeCheckLog(models.Model):

@@ -8,6 +8,8 @@ export const portfoliosApi = {
     api.post<Portfolio>("/portfolios/", data),
   update: (id: number, data: { name?: string; exchange_id?: string; description?: string }) =>
     api.put<Portfolio>(`/portfolios/${id}/`, data),
+  patch: (id: number, data: { name?: string; exchange_id?: string; description?: string }) =>
+    api.patch<Portfolio>(`/portfolios/${id}/`, data),
   delete: (id: number) => api.delete<void>(`/portfolios/${id}/`),
   addHolding: (portfolioId: number, data: { symbol: string; amount?: number; avg_buy_price?: number }) =>
     api.post<Holding>(`/portfolios/${portfolioId}/holdings/`, data),

@@ -86,6 +86,15 @@ export function RiskManagement() {
     onError: (err) => toast((err as Error).message || "Failed to resume trading", "error"),
   });
 
+  const recordMetricsMutation = useMutation({
+    mutationFn: () => riskApi.recordMetrics(portfolioId, varMethod),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["risk-metric-history", portfolioId] });
+      toast("Metrics snapshot recorded", "success");
+    },
+    onError: (err) => toast((err as Error).message || "Failed to record metrics", "error"),
+  });
+
   // Limits editor state
   const [isEditing, setIsEditing] = useState(false);
   const [editLimits, setEditLimits] = useState<Partial<RiskLimits>>({});
@@ -599,15 +608,24 @@ export function RiskManagement() {
       <div className="mt-6 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-semibold">VaR History</h3>
-          <select
-            value={historyHours}
-            onChange={(e) => setHistoryHours(Number(e.target.value))}
-            className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1 text-xs"
-          >
-            <option value={24}>24h</option>
-            <option value={168}>7d</option>
-            <option value={720}>30d</option>
-          </select>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => recordMetricsMutation.mutate()}
+              disabled={recordMetricsMutation.isPending}
+              className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-1 text-xs transition-colors hover:bg-[var(--color-surface)] disabled:opacity-50"
+            >
+              {recordMetricsMutation.isPending ? "Recording..." : "Snapshot Now"}
+            </button>
+            <select
+              value={historyHours}
+              onChange={(e) => setHistoryHours(Number(e.target.value))}
+              className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1 text-xs"
+            >
+              <option value={24}>24h</option>
+              <option value={168}>7d</option>
+              <option value={720}>30d</option>
+            </select>
+          </div>
         </div>
         {metricHistory && metricHistory.length > 0 ? (
           <div className="overflow-x-auto">

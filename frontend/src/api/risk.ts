@@ -61,4 +61,7 @@ export const riskApi = {
 
   getAlerts: (portfolioId: number, limit: number = 50) =>
     api.get<AlertLogEntry[]>(`/risk/${portfolioId}/alerts/?limit=${limit}`),
+
+  recordMetrics: (portfolioId: number, method: string = "parametric") =>
+    api.post<RiskMetricHistoryEntry>(`/risk/${portfolioId}/record-metrics/?method=${method}`),
 };

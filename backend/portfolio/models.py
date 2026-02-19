@@ -2,6 +2,10 @@ from django.db import models
 
 
 class Portfolio(models.Model):
+    # Design: single-user platform (Jetson deployment). No user FK — all
+    # authenticated users share all portfolios. If multi-user support is
+    # needed, add `user = models.ForeignKey(settings.AUTH_USER_MODEL, ...)`
+    # and filter querysets by request.user in views.
     name = models.CharField(max_length=100)
     exchange_id = models.CharField(max_length=50, default="binance")
     description = models.CharField(max_length=500, default="", blank=True)

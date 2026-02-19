@@ -90,11 +90,10 @@ class NotificationPreferencesView(APIView):
 
 
 class MetricsView(APIView):
-    permission_classes = [AllowAny]
-
     @extend_schema(tags=["Core"], exclude=True)
     def get(self, request: Request) -> HttpResponse:
         from core.services.metrics import metrics
+        from portfolio.models import Portfolio
         from risk.models import RiskState
         from trading.models import Order, OrderStatus, TradingMode
 
@@ -111,17 +110,19 @@ class MetricsView(APIView):
             metrics.gauge("active_orders", live_orders, {"mode": "live"})
             metrics.gauge("active_orders", paper_orders, {"mode": "paper"})
         except Exception:
-            pass
+            logger.warning("Failed to snapshot order metrics", exc_info=True)
 
         try:
-            state = RiskState.objects.filter(portfolio_id=1).first()
-            if state:
-                metrics.gauge("portfolio_equity", state.total_equity)
-                peak = state.peak_equity if state.peak_equity > 0 else 1
-                metrics.gauge("portfolio_drawdown", 1.0 - (state.total_equity / peak))
-                metrics.gauge("risk_halt_active", 1.0 if state.is_halted else 0.0)
+            primary = Portfolio.objects.order_by("id").values_list("id", flat=True).first()
+            if primary:
+                state = RiskState.objects.filter(portfolio_id=primary).first()
+                if state:
+                    metrics.gauge("portfolio_equity", state.total_equity)
+                    peak = state.peak_equity if state.peak_equity > 0 else 1
+                    metrics.gauge("portfolio_drawdown", 1.0 - (state.total_equity / peak))
+                    metrics.gauge("risk_halt_active", 1.0 if state.is_halted else 0.0)
         except Exception:
-            pass
+            logger.warning("Failed to snapshot risk metrics", exc_info=True)
 
         return HttpResponse(metrics.collect(), content_type="text/plain; charset=utf-8")
 

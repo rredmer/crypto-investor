@@ -222,6 +222,10 @@ CORS_ALLOW_METHODS = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
 CORS_ALLOW_HEADERS = ["content-type", "x-csrftoken"]
 
 # ── Channels (ASGI) ──────────────────────────────────────────
+# NOTE: InMemoryChannelLayer only works within a single process. WebSocket
+# messages sent in one Daphne worker will NOT reach consumers in another.
+# This is acceptable for the Jetson single-process deployment target.
+# For multi-process deployments, switch to channels_redis.core.RedisChannelLayer.
 ASGI_APPLICATION = "config.asgi.application"
 CHANNEL_LAYERS = {
     "default": {
@@ -240,9 +244,23 @@ USE_I18N = False
 USE_TZ = True
 
 # ── App settings (used by services) ──────────────────────────
+# NOTE: Legacy env-var credentials. The preferred method is the DB-backed
+# ExchangeConfig model (encrypted). If both are set, the DB config takes
+# priority. Run `manage.py migrate_env_credentials` to migrate, then unset
+# these env vars.
 EXCHANGE_ID = os.environ.get("EXCHANGE_ID", "binance")
 EXCHANGE_API_KEY = os.environ.get("EXCHANGE_API_KEY", "")
 EXCHANGE_API_SECRET = os.environ.get("EXCHANGE_API_SECRET", "")
+
+if EXCHANGE_API_KEY and not TESTING:
+    import warnings
+
+    warnings.warn(
+        "EXCHANGE_API_KEY env var is set. Prefer DB-backed ExchangeConfig "
+        "(encrypted). Run `manage.py migrate_env_credentials` to migrate.",
+        DeprecationWarning,
+        stacklevel=1,
+    )
 
 MAX_JOB_WORKERS = int(os.environ.get("MAX_JOB_WORKERS", "2"))
 
