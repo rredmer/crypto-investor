@@ -26,9 +26,7 @@ class TestNotificationService:
 
         with patch("core.services.notification.settings") as mock_settings:
             mock_settings.NOTIFICATION_WEBHOOK_URL = ""
-            delivered, error = await NotificationService.send_webhook(
-                "test", "test_event"
-            )
+            delivered, error = await NotificationService.send_webhook("test", "test_event")
             assert delivered is False
             assert "not configured" in error.lower()
 
@@ -51,9 +49,7 @@ class TestNotificationService:
             mock_client.__aexit__ = AsyncMock(return_value=False)
             mock_client_cls.return_value = mock_client
 
-            delivered, error = await NotificationService.send_telegram(
-                "test message"
-            )
+            delivered, error = await NotificationService.send_telegram("test message")
             assert delivered is True
             assert error == ""
 
@@ -68,18 +64,14 @@ class TestNotificationService:
             patch("core.services.notification.settings") as mock_settings,
             patch("httpx.AsyncClient") as mock_client_cls,
         ):
-            mock_settings.NOTIFICATION_WEBHOOK_URL = (
-                "https://hooks.example.com/test"
-            )
+            mock_settings.NOTIFICATION_WEBHOOK_URL = "https://hooks.example.com/test"
             mock_client = AsyncMock()
             mock_client.post = AsyncMock(return_value=mock_resp)
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=False)
             mock_client_cls.return_value = mock_client
 
-            delivered, error = await NotificationService.send_webhook(
-                "test", "halt"
-            )
+            delivered, error = await NotificationService.send_webhook("test", "halt")
             assert delivered is True
             assert error == ""
 
@@ -89,8 +81,11 @@ class TestTelegramFormatter:
         from core.services.notification import TelegramFormatter
 
         order = SimpleNamespace(
-            side="buy", amount=0.5, symbol="BTC/USDT",
-            order_type="market", exchange_id="binance",
+            side="buy",
+            amount=0.5,
+            symbol="BTC/USDT",
+            order_type="market",
+            exchange_id="binance",
             exchange_order_id="EX-123",
         )
         msg = TelegramFormatter.order_submitted(order)
@@ -103,8 +98,12 @@ class TestTelegramFormatter:
         from core.services.notification import TelegramFormatter
 
         order = SimpleNamespace(
-            side="sell", amount=1.0, symbol="ETH/USDT",
-            avg_fill_price=3200.50, fee=0.32, fee_currency="USDT",
+            side="sell",
+            amount=1.0,
+            symbol="ETH/USDT",
+            avg_fill_price=3200.50,
+            fee=0.32,
+            fee_currency="USDT",
             exchange_order_id="EX-456",
         )
         msg = TelegramFormatter.order_filled(order)
@@ -117,8 +116,12 @@ class TestTelegramFormatter:
         from core.services.notification import TelegramFormatter
 
         order = SimpleNamespace(
-            side="buy", amount=0.1, symbol="BTC/USDT",
-            avg_fill_price=50000, fee=None, fee_currency="",
+            side="buy",
+            amount=0.1,
+            symbol="BTC/USDT",
+            avg_fill_price=50000,
+            fee=None,
+            fee_currency="",
             exchange_order_id="EX-789",
         )
         msg = TelegramFormatter.order_filled(order)
@@ -128,7 +131,9 @@ class TestTelegramFormatter:
         from core.services.notification import TelegramFormatter
 
         order = SimpleNamespace(
-            side="buy", amount=0.5, symbol="BTC/USDT",
+            side="buy",
+            amount=0.5,
+            symbol="BTC/USDT",
             exchange_order_id="EX-100",
         )
         msg = TelegramFormatter.order_cancelled(order)
@@ -187,9 +192,7 @@ class TestNotificationPreferences:
         from core.models import NotificationPreferences
         from core.services.notification import NotificationService
 
-        NotificationPreferences.objects.create(
-            portfolio_id=99, telegram_enabled=False
-        )
+        NotificationPreferences.objects.create(portfolio_id=99, telegram_enabled=False)
         assert NotificationService.should_notify(99, "halt", "telegram") is False
         assert NotificationService.should_notify(99, "halt", "log") is True
 
@@ -197,9 +200,7 @@ class TestNotificationPreferences:
         from core.models import NotificationPreferences
         from core.services.notification import NotificationService
 
-        NotificationPreferences.objects.create(
-            portfolio_id=98, on_risk_halt=False
-        )
+        NotificationPreferences.objects.create(portfolio_id=98, on_risk_halt=False)
         assert NotificationService.should_notify(98, "halt", "telegram") is False
         assert NotificationService.should_notify(98, "order_submitted", "telegram") is True
 
@@ -213,9 +214,7 @@ class TestAlertLogging:
         RiskManagementService.halt_trading(1, "alert test")
         # The sync halt method doesn't call send_notification, so create the
         # alert manually to match the async halt behavior
-        RiskManagementService.send_notification(
-            1, "halt", "critical", "Trading HALTED: alert test"
-        )
+        RiskManagementService.send_notification(1, "halt", "critical", "Trading HALTED: alert test")
 
         alerts_resp = authenticated_client.get("/api/risk/1/alerts/?limit=10")
         assert alerts_resp.status_code == 200

@@ -62,6 +62,7 @@ class TestAuth:
 
         # Clear any existing lockout state
         from core.auth import _failed_logins
+
         _failed_logins.clear()
 
         for _ in range(3):

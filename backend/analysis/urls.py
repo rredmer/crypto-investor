@@ -53,7 +53,8 @@ urlpatterns = [
     path("data/generate-sample/", DataGenerateSampleView.as_view(), name="data-generate-sample"),
     path(
         "data/<str:exchange>/<str:symbol>/<str:timeframe>/",
-        DataDetailView.as_view(), name="data-detail",
+        DataDetailView.as_view(),
+        name="data-detail",
     ),
     # ML
     path("ml/train/", MLTrainView.as_view(), name="ml-train"),

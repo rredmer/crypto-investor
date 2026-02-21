@@ -1,9 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { exchangesApi } from "../api/exchanges";
 import { portfoliosApi } from "../api/portfolios";
 import { platformApi } from "../api/platform";
 import { jobsApi } from "../api/jobs";
 import { regimeApi } from "../api/regime";
+import { riskApi } from "../api/risk";
 import { ProgressBar } from "../components/ProgressBar";
 import type {
   BackgroundJob,
@@ -12,9 +14,13 @@ import type {
   Portfolio,
   RegimeState,
   RegimeType,
+  RiskStatus,
 } from "../types";
 
 export function Dashboard() {
+  const queryClient = useQueryClient();
+
+  useEffect(() => { document.title = "Dashboard | Crypto Investor"; }, []);
   const exchanges = useQuery<ExchangeInfo[]>({
     queryKey: ["exchanges"],
     queryFn: exchangesApi.list,
@@ -45,12 +51,33 @@ export function Dashboard() {
     refetchInterval: 30000,
   });
 
+  // Compute aggregate portfolio value from holdings
+  const totalValue = portfolios.data?.reduce(
+    (sum, p) => sum + p.holdings.reduce((s, h) => s + (h.amount ?? 0) * (h.avg_buy_price ?? 0), 0),
+    0,
+  ) ?? 0;
+
+  // Fetch risk status for the first portfolio (daily P&L)
+  const primaryPortfolioId = portfolios.data?.[0]?.id;
+  const { data: riskStatus } = useQuery<RiskStatus>({
+    queryKey: ["risk-status", primaryPortfolioId],
+    queryFn: () => riskApi.getStatus(primaryPortfolioId!),
+    enabled: primaryPortfolioId != null,
+  });
+
   return (
     <div>
       <h2 className="mb-6 text-2xl font-bold">Dashboard</h2>
 
+      {(exchanges.isError || portfolios.isError) && (
+        <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
+          {exchanges.isError && <p>Failed to load exchanges: {exchanges.error instanceof Error ? exchanges.error.message : "Unknown error"}</p>}
+          {portfolios.isError && <p>Failed to load portfolios: {portfolios.error instanceof Error ? portfolios.error.message : "Unknown error"}</p>}
+        </div>
+      )}
+
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-7">
         <SummaryCard
           label="Portfolios"
           value={portfolios.data?.length ?? 0}
@@ -69,6 +96,16 @@ export function Dashboard() {
           label="Active Jobs"
           value={activeJobs?.length ?? 0}
           pulse={activeJobs !== undefined && activeJobs.length > 0}
+        />
+        <SummaryCard
+          label="Portfolio Value"
+          text={`$${totalValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
+          loading={portfolios.isLoading}
+        />
+        <SummaryCard
+          label="Daily P&L"
+          text={riskStatus ? `$${riskStatus.daily_pnl.toFixed(2)}` : "—"}
+          textColor={riskStatus && riskStatus.daily_pnl >= 0 ? "text-green-400" : riskStatus && riskStatus.daily_pnl < 0 ? "text-red-400" : ""}
         />
         <SummaryCard label="Status" text="Online" textColor="text-[var(--color-success)]" />
       </div>
@@ -124,9 +161,21 @@ export function Dashboard() {
 
         {/* Active / Recent Jobs */}
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
-          <h3 className="mb-4 text-lg font-semibold">Recent Jobs</h3>
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-lg font-semibold">Recent Jobs</h3>
+            <button
+              onClick={() => queryClient.invalidateQueries({ queryKey: ["recent-jobs"] })}
+              className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1 text-xs text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface)] hover:text-[var(--color-text)]"
+              title="Refresh jobs"
+            >
+              &#8635; Refresh
+            </button>
+          </div>
           {(!recentJobs || recentJobs.length === 0) && (
-            <p className="text-sm text-[var(--color-text-muted)]">No recent jobs.</p>
+            <div className="text-sm text-[var(--color-text-muted)]">
+              <p>No recent jobs.</p>
+              <p className="mt-1 text-xs">Jobs will appear when you run backtests or data downloads.</p>
+            </div>
           )}
           {recentJobs && recentJobs.length > 0 && (
             <div className="space-y-3">

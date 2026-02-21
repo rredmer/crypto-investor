@@ -61,24 +61,30 @@ class SystemEventsConsumer(AsyncJsonWebsocketConsumer):
 
     async def halt_status(self, event):
         """Handle halt_status messages."""
-        await self.send_json({
-            "type": "halt_status",
-            "data": event["data"],
-        })
+        await self.send_json(
+            {
+                "type": "halt_status",
+                "data": event["data"],
+            }
+        )
 
     async def order_update(self, event):
         """Handle order_update messages."""
-        await self.send_json({
-            "type": "order_update",
-            "data": event["data"],
-        })
+        await self.send_json(
+            {
+                "type": "order_update",
+                "data": event["data"],
+            }
+        )
 
     async def risk_alert(self, event):
         """Handle risk_alert messages."""
-        await self.send_json({
-            "type": "risk_alert",
-            "data": event["data"],
-        })
+        await self.send_json(
+            {
+                "type": "risk_alert",
+                "data": event["data"],
+            }
+        )
 
     @database_sync_to_async
     def _is_authenticated(self) -> bool:

@@ -38,9 +38,7 @@ _thread_pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="indicator")
 
 
 class ExchangeConfigListView(APIView):
-    @extend_schema(
-        responses=ExchangeConfigSerializer(many=True), tags=["Market"]
-    )
+    @extend_schema(responses=ExchangeConfigSerializer(many=True), tags=["Market"])
     def get(self, request: Request) -> Response:
         configs = ExchangeConfig.objects.all()
         serializer = ExchangeConfigSerializer(configs, many=True)
@@ -55,9 +53,7 @@ class ExchangeConfigListView(APIView):
         serializer = ExchangeConfigCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         instance = serializer.save()
-        return Response(
-            ExchangeConfigSerializer(instance).data, status=status.HTTP_201_CREATED
-        )
+        return Response(ExchangeConfigSerializer(instance).data, status=status.HTTP_201_CREATED)
 
 
 class ExchangeConfigDetailView(APIView):
@@ -142,14 +138,15 @@ class ExchangeConfigTestView(APIView):
         )
 
         if success:
-            return Response({
-                "success": True,
-                "markets_count": markets_count,
-                "message": (
-                    f"Connected to {config.exchange_id}"
-                    f" — {markets_count} markets loaded"
-                ),
-            })
+            return Response(
+                {
+                    "success": True,
+                    "markets_count": markets_count,
+                    "message": (
+                        f"Connected to {config.exchange_id} — {markets_count} markets loaded"
+                    ),
+                }
+            )
         return Response(
             {"success": False, "message": error_msg},
             status=status.HTTP_400_BAD_REQUEST,
@@ -160,9 +157,7 @@ class ExchangeConfigTestView(APIView):
 
 
 class DataSourceConfigListView(APIView):
-    @extend_schema(
-        responses=DataSourceConfigSerializer(many=True), tags=["Market"]
-    )
+    @extend_schema(responses=DataSourceConfigSerializer(many=True), tags=["Market"])
     def get(self, request: Request) -> Response:
         sources = DataSourceConfig.objects.select_related("exchange_config").all()
         serializer = DataSourceConfigSerializer(sources, many=True)
@@ -222,9 +217,7 @@ class DataSourceConfigDetailView(APIView):
 
 
 class ExchangeListView(APIView):
-    @extend_schema(
-        responses=ExchangeInfoSerializer(many=True), tags=["Market"]
-    )
+    @extend_schema(responses=ExchangeInfoSerializer(many=True), tags=["Market"])
     def get(self, request: Request) -> Response:
         from market.services.exchange import ExchangeService
 
@@ -250,9 +243,7 @@ class TickerView(APIView):
 
 
 class TickerListView(APIView):
-    @extend_schema(
-        responses=TickerDataSerializer(many=True), tags=["Market"]
-    )
+    @extend_schema(responses=TickerDataSerializer(many=True), tags=["Market"])
     def get(self, request: Request) -> Response:
         from asgiref.sync import async_to_sync
 
@@ -272,9 +263,7 @@ class TickerListView(APIView):
 
 
 class OHLCVView(APIView):
-    @extend_schema(
-        responses=OHLCVDataSerializer(many=True), tags=["Market"]
-    )
+    @extend_schema(responses=OHLCVDataSerializer(many=True), tags=["Market"])
     def get(self, request: Request, symbol: str) -> Response:
         from asgiref.sync import async_to_sync
 
@@ -330,9 +319,7 @@ class IndicatorComputeView(APIView):
 
 
 class RegimeCurrentAllView(APIView):
-    @extend_schema(
-        responses=RegimeStateSerializer(many=True), tags=["Regime"]
-    )
+    @extend_schema(responses=RegimeStateSerializer(many=True), tags=["Regime"])
     def get(self, request: Request) -> Response:
         service = _get_regime_service()
         return Response(service.get_all_current_regimes())
@@ -344,18 +331,23 @@ class RegimeCurrentView(APIView):
         service = _get_regime_service()
         result = service.get_current_regime(symbol)
         if result is None:
-            return Response({
-                "symbol": symbol, "regime": "unknown", "confidence": 0.0,
-                "adx_value": 0.0, "bb_width_percentile": 0.0, "ema_slope": 0.0,
-                "trend_alignment": 0.0, "price_structure_score": 0.0,
-            })
+            return Response(
+                {
+                    "symbol": symbol,
+                    "regime": "unknown",
+                    "confidence": 0.0,
+                    "adx_value": 0.0,
+                    "bb_width_percentile": 0.0,
+                    "ema_slope": 0.0,
+                    "trend_alignment": 0.0,
+                    "price_structure_score": 0.0,
+                }
+            )
         return Response(result)
 
 
 class RegimeHistoryView(APIView):
-    @extend_schema(
-        responses=RegimeHistoryEntrySerializer(many=True), tags=["Regime"]
-    )
+    @extend_schema(responses=RegimeHistoryEntrySerializer(many=True), tags=["Regime"])
     def get(self, request: Request, symbol: str) -> Response:
         limit = _safe_int(request.query_params.get("limit"), 100, max_val=1000)
         service = _get_regime_service()
@@ -368,18 +360,22 @@ class RegimeRecommendationView(APIView):
         service = _get_regime_service()
         result = service.get_recommendation(symbol)
         if result is None:
-            return Response({
-                "symbol": symbol, "regime": "unknown", "confidence": 0.0,
-                "primary_strategy": "none", "weights": [],
-                "position_size_modifier": 0.0, "reasoning": "No data available",
-            })
+            return Response(
+                {
+                    "symbol": symbol,
+                    "regime": "unknown",
+                    "confidence": 0.0,
+                    "primary_strategy": "none",
+                    "weights": [],
+                    "position_size_modifier": 0.0,
+                    "reasoning": "No data available",
+                }
+            )
         return Response(result)
 
 
 class RegimeRecommendationAllView(APIView):
-    @extend_schema(
-        responses=RoutingDecisionSerializer(many=True), tags=["Regime"]
-    )
+    @extend_schema(responses=RoutingDecisionSerializer(many=True), tags=["Regime"])
     def get(self, request: Request) -> Response:
         service = _get_regime_service()
         return Response(service.get_all_recommendations())
@@ -394,18 +390,15 @@ class RegimePositionSizeView(APIView):
     def post(self, request: Request) -> Response:
         from core.platform_bridge import ensure_platform_imports
 
+        ser = RegimePositionSizeRequestSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+
         ensure_platform_imports()
         from common.risk.risk_manager import RiskManager
 
-        symbol = request.data.get("symbol", "")
-        try:
-            entry_price = float(request.data.get("entry_price", 0))
-            stop_loss_price = float(request.data.get("stop_loss_price", 0))
-        except (ValueError, TypeError):
-            return Response(
-                {"error": "Invalid entry_price or stop_loss_price"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        symbol = ser.validated_data["symbol"]
+        entry_price = ser.validated_data["entry_price"]
+        stop_loss_price = ser.validated_data["stop_loss_price"]
 
         service = _get_regime_service()
         risk_manager = RiskManager()
@@ -416,11 +409,17 @@ class RegimePositionSizeView(APIView):
             risk_manager=risk_manager,
         )
         if result is None:
-            return Response({
-                "symbol": symbol, "regime": "unknown", "regime_modifier": 0.0,
-                "position_size": 0.0, "entry_price": entry_price,
-                "stop_loss_price": stop_loss_price, "primary_strategy": "none",
-            })
+            return Response(
+                {
+                    "symbol": symbol,
+                    "regime": "unknown",
+                    "regime_modifier": 0.0,
+                    "position_size": 0.0,
+                    "entry_price": entry_price,
+                    "stop_loss_price": stop_loss_price,
+                    "primary_strategy": "none",
+                }
+            )
         return Response(result)
 
 

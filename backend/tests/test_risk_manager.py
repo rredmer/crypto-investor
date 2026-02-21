@@ -227,9 +227,7 @@ class TestRiskRewardEnforcement:
         # Use high max_single_trade_risk so stop-loss-wide check passes,
         # but R:R check still rejects (12% * 1.5 = 18% > 15%)
         rm = RiskManager(RiskLimits(max_single_trade_risk=0.10))
-        approved, reason = rm.check_new_trade(
-            "BTC/USDT", "buy", 0.01, 50000, stop_loss_price=44000
-        )
+        approved, reason = rm.check_new_trade("BTC/USDT", "buy", 0.01, 50000, stop_loss_price=44000)
         assert approved is False
         assert "risk/reward" in reason.lower()
 
@@ -240,18 +238,14 @@ class TestRiskRewardEnforcement:
         # But 5% > 4%, so this would be caught by stop-loss-wide check first.
         # Use 3% stop instead: entry 50000, stop at 48500
         # 3% * 1.5 = 4.5% required < 15% → approved
-        approved, reason = rm.check_new_trade(
-            "BTC/USDT", "buy", 0.01, 50000, stop_loss_price=48500
-        )
+        approved, reason = rm.check_new_trade("BTC/USDT", "buy", 0.01, 50000, stop_loss_price=48500)
         assert approved is True
         assert reason == "approved"
 
     def test_risk_reward_skipped_without_stop(self):
         """No stop_loss_price → R:R check skipped entirely."""
         rm = RiskManager()
-        approved, reason = rm.check_new_trade(
-            "BTC/USDT", "buy", 0.01, 50000, stop_loss_price=None
-        )
+        approved, reason = rm.check_new_trade("BTC/USDT", "buy", 0.01, 50000, stop_loss_price=None)
         assert approved is True
         assert reason == "approved"
 
@@ -414,10 +408,20 @@ class TestVaREndpointSchemas:
 
         heat = rm.portfolio_heat_check()
         required_keys = [
-            "healthy", "issues", "drawdown", "daily_pnl",
-            "open_positions", "max_correlation", "high_corr_pairs",
-            "max_concentration", "position_weights",
-            "var_95", "var_99", "cvar_95", "cvar_99", "is_halted",
+            "healthy",
+            "issues",
+            "drawdown",
+            "daily_pnl",
+            "open_positions",
+            "max_correlation",
+            "high_corr_pairs",
+            "max_concentration",
+            "position_weights",
+            "var_95",
+            "var_99",
+            "cvar_95",
+            "cvar_99",
+            "is_halted",
         ]
         for key in required_keys:
             assert key in heat, f"Missing key: {key}"
@@ -441,8 +445,17 @@ class TestRiskMetricHistorySchemas:
 
         field_names = {f.name for f in RiskMetricHistory._meta.get_fields()}
         required = {
-            "id", "portfolio_id", "var_95", "var_99", "cvar_95", "cvar_99",
-            "method", "drawdown", "equity", "open_positions_count", "recorded_at",
+            "id",
+            "portfolio_id",
+            "var_95",
+            "var_99",
+            "cvar_95",
+            "cvar_99",
+            "method",
+            "drawdown",
+            "equity",
+            "open_positions_count",
+            "recorded_at",
         }
         assert required.issubset(field_names)
 
@@ -485,9 +498,19 @@ class TestTradeCheckLogSchemas:
 
         field_names = {f.name for f in TradeCheckLog._meta.get_fields()}
         required = {
-            "id", "portfolio_id", "symbol", "side", "size", "entry_price",
-            "stop_loss_price", "approved", "reason", "equity_at_check",
-            "drawdown_at_check", "open_positions_at_check", "checked_at",
+            "id",
+            "portfolio_id",
+            "symbol",
+            "side",
+            "size",
+            "entry_price",
+            "stop_loss_price",
+            "approved",
+            "reason",
+            "equity_at_check",
+            "drawdown_at_check",
+            "open_positions_at_check",
+            "checked_at",
         }
         assert required.issubset(field_names)
 
@@ -527,9 +550,7 @@ class TestTradeCheckLogSchemas:
         stoploss = -0.05
         entry = 50000
         stop = entry * (1 + stoploss)  # 47500
-        approved, reason = rm.check_new_trade(
-            "BTC/USDT", "buy", 0.01, entry, stop_loss_price=stop
-        )
+        approved, reason = rm.check_new_trade("BTC/USDT", "buy", 0.01, entry, stop_loss_price=stop)
         assert approved is True
 
     def test_bmr_stoploss_passes_threshold(self):
@@ -538,9 +559,7 @@ class TestTradeCheckLogSchemas:
         stoploss = -0.04
         entry = 50000
         stop = entry * (1 + stoploss)  # 48000
-        approved, reason = rm.check_new_trade(
-            "BTC/USDT", "buy", 0.01, entry, stop_loss_price=stop
-        )
+        approved, reason = rm.check_new_trade("BTC/USDT", "buy", 0.01, entry, stop_loss_price=stop)
         assert approved is True
 
     def test_vb_stoploss_passes_threshold(self):
@@ -549,9 +568,7 @@ class TestTradeCheckLogSchemas:
         stoploss = -0.03
         entry = 50000
         stop = entry * (1 + stoploss)  # 48500
-        approved, reason = rm.check_new_trade(
-            "BTC/USDT", "buy", 0.01, entry, stop_loss_price=stop
-        )
+        approved, reason = rm.check_new_trade("BTC/USDT", "buy", 0.01, entry, stop_loss_price=stop)
         assert approved is True
 
     def test_trade_check_log_serializer_nullable_stop_loss(self):

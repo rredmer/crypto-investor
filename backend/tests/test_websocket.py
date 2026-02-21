@@ -29,18 +29,14 @@ class TestMarketTickerConsumer:
     async def test_anonymous_rejected(self):
         from django.contrib.auth.models import AnonymousUser
 
-        comm = _make_communicator(
-            MarketTickerConsumer, "/ws/market/tickers/", user=AnonymousUser()
-        )
+        comm = _make_communicator(MarketTickerConsumer, "/ws/market/tickers/", user=AnonymousUser())
         connected, code = await comm.connect()
         assert not connected or code == 4001
         await comm.disconnect()
 
     async def test_authenticated_accepted(self):
         user = await _create_user()
-        comm = _make_communicator(
-            MarketTickerConsumer, "/ws/market/tickers/", user=user
-        )
+        comm = _make_communicator(MarketTickerConsumer, "/ws/market/tickers/", user=user)
         connected, _ = await comm.connect()
         assert connected
         await comm.disconnect()
@@ -49,9 +45,7 @@ class TestMarketTickerConsumer:
         from channels.layers import get_channel_layer
 
         user = await _create_user()
-        comm = _make_communicator(
-            MarketTickerConsumer, "/ws/market/tickers/", user=user
-        )
+        comm = _make_communicator(MarketTickerConsumer, "/ws/market/tickers/", user=user)
         connected, _ = await comm.connect()
         assert connected
 
@@ -75,18 +69,14 @@ class TestSystemEventsConsumer:
     async def test_anonymous_rejected(self):
         from django.contrib.auth.models import AnonymousUser
 
-        comm = _make_communicator(
-            SystemEventsConsumer, "/ws/system/", user=AnonymousUser()
-        )
+        comm = _make_communicator(SystemEventsConsumer, "/ws/system/", user=AnonymousUser())
         connected, code = await comm.connect()
         assert not connected or code == 4001
         await comm.disconnect()
 
     async def test_order_update_relayed(self):
         user = await _create_user()
-        comm = _make_communicator(
-            SystemEventsConsumer, "/ws/system/", user=user
-        )
+        comm = _make_communicator(SystemEventsConsumer, "/ws/system/", user=user)
         connected, _ = await comm.connect()
         assert connected
 
@@ -108,9 +98,7 @@ class TestSystemEventsConsumer:
 
     async def test_halt_status_relayed(self):
         user = await _create_user()
-        comm = _make_communicator(
-            SystemEventsConsumer, "/ws/system/", user=user
-        )
+        comm = _make_communicator(SystemEventsConsumer, "/ws/system/", user=user)
         connected, _ = await comm.connect()
         assert connected
 

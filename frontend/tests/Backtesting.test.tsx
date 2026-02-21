@@ -49,7 +49,7 @@ describe("Backtesting Page", () => {
   it("renders history table after data loads", async () => {
     renderWithProviders(<Backtesting />);
     expect(await screen.findByText("History")).toBeInTheDocument();
-    const cells = screen.getAllByText("CryptoInvestorV1");
+    const cells = await screen.findAllByText("CryptoInvestorV1");
     expect(cells.length).toBeGreaterThanOrEqual(1);
   });
 });

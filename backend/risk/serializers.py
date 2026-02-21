@@ -7,21 +7,26 @@ class RiskLimitsSerializer(serializers.ModelSerializer):
     class Meta:
         model = RiskLimits
         fields = [
-            "max_portfolio_drawdown", "max_single_trade_risk", "max_daily_loss",
-            "max_open_positions", "max_position_size_pct", "max_correlation",
-            "min_risk_reward", "max_leverage",
+            "max_portfolio_drawdown",
+            "max_single_trade_risk",
+            "max_daily_loss",
+            "max_open_positions",
+            "max_position_size_pct",
+            "max_correlation",
+            "min_risk_reward",
+            "max_leverage",
         ]
 
 
 class RiskLimitsUpdateSerializer(serializers.Serializer):
-    max_portfolio_drawdown = serializers.FloatField(required=False)
-    max_single_trade_risk = serializers.FloatField(required=False)
-    max_daily_loss = serializers.FloatField(required=False)
-    max_open_positions = serializers.IntegerField(required=False)
-    max_position_size_pct = serializers.FloatField(required=False)
-    max_correlation = serializers.FloatField(required=False)
-    min_risk_reward = serializers.FloatField(required=False)
-    max_leverage = serializers.FloatField(required=False)
+    max_portfolio_drawdown = serializers.FloatField(required=False, min_value=0.01, max_value=1.0)
+    max_single_trade_risk = serializers.FloatField(required=False, min_value=0.001, max_value=1.0)
+    max_daily_loss = serializers.FloatField(required=False, min_value=0.01, max_value=1.0)
+    max_open_positions = serializers.IntegerField(required=False, min_value=1, max_value=100)
+    max_position_size_pct = serializers.FloatField(required=False, min_value=0.01, max_value=1.0)
+    max_correlation = serializers.FloatField(required=False, min_value=0.0, max_value=1.0)
+    min_risk_reward = serializers.FloatField(required=False, min_value=0.1, max_value=100.0)
+    max_leverage = serializers.FloatField(required=False, min_value=1.0, max_value=125.0)
 
 
 class RiskStatusSerializer(serializers.Serializer):
@@ -36,15 +41,19 @@ class RiskStatusSerializer(serializers.Serializer):
 
 
 class EquityUpdateSerializer(serializers.Serializer):
-    equity = serializers.FloatField()
+    equity = serializers.FloatField(min_value=0.0)
 
 
 class TradeCheckRequestSerializer(serializers.Serializer):
-    symbol = serializers.CharField()
-    side = serializers.CharField()
-    size = serializers.FloatField()
-    entry_price = serializers.FloatField()
-    stop_loss_price = serializers.FloatField(required=False, allow_null=True)
+    symbol = serializers.RegexField(
+        regex=r"^[A-Z0-9]{2,10}/[A-Z0-9]{2,10}$",
+        max_length=20,
+        help_text="Trading pair, e.g. BTC/USDT",
+    )
+    side = serializers.ChoiceField(choices=["buy", "sell"])
+    size = serializers.FloatField(min_value=1e-8)
+    entry_price = serializers.FloatField(min_value=1e-8)
+    stop_loss_price = serializers.FloatField(required=False, allow_null=True, min_value=0.0)
 
 
 class TradeCheckResponseSerializer(serializers.Serializer):
@@ -53,9 +62,14 @@ class TradeCheckResponseSerializer(serializers.Serializer):
 
 
 class PositionSizeRequestSerializer(serializers.Serializer):
-    entry_price = serializers.FloatField()
-    stop_loss_price = serializers.FloatField()
-    risk_per_trade = serializers.FloatField(required=False, allow_null=True)
+    entry_price = serializers.FloatField(min_value=1e-8)
+    stop_loss_price = serializers.FloatField(min_value=1e-8)
+    risk_per_trade = serializers.FloatField(
+        required=False,
+        allow_null=True,
+        min_value=0.001,
+        max_value=1.0,
+    )
 
 
 class PositionSizeResponseSerializer(serializers.Serializer):
@@ -94,13 +108,22 @@ class RiskMetricHistorySerializer(serializers.ModelSerializer):
     class Meta:
         model = RiskMetricHistory
         fields = [
-            "id", "portfolio_id", "var_95", "var_99", "cvar_95", "cvar_99",
-            "method", "drawdown", "equity", "open_positions_count", "recorded_at",
+            "id",
+            "portfolio_id",
+            "var_95",
+            "var_99",
+            "cvar_95",
+            "cvar_99",
+            "method",
+            "drawdown",
+            "equity",
+            "open_positions_count",
+            "recorded_at",
         ]
 
 
 class HaltRequestSerializer(serializers.Serializer):
-    reason = serializers.CharField()
+    reason = serializers.CharField(min_length=1, max_length=500)
 
 
 class HaltResponseSerializer(serializers.Serializer):
@@ -113,8 +136,15 @@ class AlertLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = AlertLog
         fields = [
-            "id", "portfolio_id", "event_type", "severity", "message",
-            "channel", "delivered", "error", "created_at",
+            "id",
+            "portfolio_id",
+            "event_type",
+            "severity",
+            "message",
+            "channel",
+            "delivered",
+            "error",
+            "created_at",
         ]
 
 
@@ -122,7 +152,17 @@ class TradeCheckLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = TradeCheckLog
         fields = [
-            "id", "portfolio_id", "symbol", "side", "size", "entry_price",
-            "stop_loss_price", "approved", "reason", "equity_at_check",
-            "drawdown_at_check", "open_positions_at_check", "checked_at",
+            "id",
+            "portfolio_id",
+            "symbol",
+            "side",
+            "size",
+            "entry_price",
+            "stop_loss_price",
+            "approved",
+            "reason",
+            "equity_at_check",
+            "drawdown_at_check",
+            "open_positions_at_check",
+            "checked_at",
         ]

@@ -7,18 +7,37 @@ class JobSerializer(serializers.ModelSerializer):
     class Meta:
         model = BackgroundJob
         fields = [
-            "id", "job_type", "status", "progress", "progress_message",
-            "params", "result", "error", "started_at", "completed_at", "created_at",
+            "id",
+            "job_type",
+            "status",
+            "progress",
+            "progress_message",
+            "params",
+            "result",
+            "error",
+            "started_at",
+            "completed_at",
+            "created_at",
         ]
 
 
 class BacktestRequestSerializer(serializers.Serializer):
     framework = serializers.CharField(default="freqtrade")
-    strategy = serializers.CharField(default="SampleStrategy")
-    symbol = serializers.CharField(default="BTC/USDT")
-    timeframe = serializers.CharField(default="1h")
+    strategy = serializers.CharField(default="SampleStrategy", min_length=1)
+    symbol = serializers.RegexField(
+        regex=r"^[A-Z0-9]{2,10}/[A-Z0-9]{2,10}$",
+        max_length=20,
+        default="BTC/USDT",
+        help_text="Trading pair, e.g. BTC/USDT",
+    )
+    timeframe = serializers.RegexField(
+        regex=r"^[0-9]+[smhdwM]$",
+        max_length=10,
+        default="1h",
+        help_text="Timeframe, e.g. 1h, 4h, 1d",
+    )
     timerange = serializers.CharField(default="", allow_blank=True)
-    exchange = serializers.CharField(default="binance")
+    exchange = serializers.CharField(default="binance", min_length=1)
 
 
 class StrategyInfoSerializer(serializers.Serializer):
@@ -33,16 +52,35 @@ class BacktestResultSerializer(serializers.ModelSerializer):
     class Meta:
         model = BacktestResult
         fields = [
-            "id", "job_id", "framework", "strategy_name", "symbol",
-            "timeframe", "timerange", "metrics", "trades", "config", "created_at",
+            "id",
+            "job_id",
+            "framework",
+            "strategy_name",
+            "symbol",
+            "timeframe",
+            "timerange",
+            "metrics",
+            "trades",
+            "config",
+            "created_at",
         ]
 
 
 class ScreenRequestSerializer(serializers.Serializer):
-    symbol = serializers.CharField(default="BTC/USDT")
-    timeframe = serializers.CharField(default="1h")
-    exchange = serializers.CharField(default="binance")
-    fees = serializers.FloatField(default=0.001)
+    symbol = serializers.RegexField(
+        regex=r"^[A-Z0-9]{2,10}/[A-Z0-9]{2,10}$",
+        max_length=20,
+        default="BTC/USDT",
+        help_text="Trading pair, e.g. BTC/USDT",
+    )
+    timeframe = serializers.RegexField(
+        regex=r"^[0-9]+[smhdwM]$",
+        max_length=10,
+        default="1h",
+        help_text="Timeframe, e.g. 1h, 4h, 1d",
+    )
+    exchange = serializers.CharField(default="binance", min_length=1)
+    fees = serializers.FloatField(default=0.001, min_value=0.0, max_value=0.1)
 
 
 class ScreenResultSerializer(serializers.ModelSerializer):
@@ -51,8 +89,15 @@ class ScreenResultSerializer(serializers.ModelSerializer):
     class Meta:
         model = ScreenResult
         fields = [
-            "id", "job_id", "symbol", "timeframe", "strategy_name",
-            "top_results", "summary", "total_combinations", "created_at",
+            "id",
+            "job_id",
+            "symbol",
+            "timeframe",
+            "strategy_name",
+            "top_results",
+            "summary",
+            "total_combinations",
+            "created_at",
         ]
 
 
@@ -80,14 +125,14 @@ class DataDetailInfoSerializer(serializers.Serializer):
 class DataDownloadRequestSerializer(serializers.Serializer):
     symbols = serializers.ListField(child=serializers.CharField(), default=["BTC/USDT", "ETH/USDT"])
     timeframes = serializers.ListField(child=serializers.CharField(), default=["1h"])
-    exchange = serializers.CharField(default="binance")
-    since_days = serializers.IntegerField(default=365)
+    exchange = serializers.CharField(default="binance", min_length=1)
+    since_days = serializers.IntegerField(default=365, min_value=1, max_value=3650)
 
 
 class DataGenerateSampleRequestSerializer(serializers.Serializer):
     symbols = serializers.ListField(child=serializers.CharField(), default=["BTC/USDT", "ETH/USDT"])
     timeframes = serializers.ListField(child=serializers.CharField(), default=["1h"])
-    days = serializers.IntegerField(default=90)
+    days = serializers.IntegerField(default=90, min_value=1, max_value=3650)
 
 
 class PaperTradingStartSerializer(serializers.Serializer):

@@ -24,7 +24,8 @@ urlpatterns = [
     path("risk/<int:portfolio_id>/check-trade/", TradeCheckView.as_view(), name="risk-check-trade"),
     path(
         "risk/<int:portfolio_id>/position-size/",
-        PositionSizeView.as_view(), name="risk-position-size",
+        PositionSizeView.as_view(),
+        name="risk-position-size",
     ),
     path("risk/<int:portfolio_id>/reset-daily/", ResetDailyView.as_view(), name="risk-reset-daily"),
     path("risk/<int:portfolio_id>/var/", VaRView.as_view(), name="risk-var"),

@@ -25,7 +25,8 @@ class BackgroundJob(models.Model):
 
 class BacktestResult(models.Model):
     job = models.ForeignKey(
-        BackgroundJob, on_delete=models.CASCADE,
+        BackgroundJob,
+        on_delete=models.CASCADE,
         related_name="backtest_results",
     )
     framework = models.CharField(max_length=20)
@@ -41,6 +42,9 @@ class BacktestResult(models.Model):
     class Meta:
         ordering = ["-created_at"]
 
+    def __str__(self):
+        return f"Backtest({self.strategy_name} {self.symbol} {self.timeframe})"
+
 
 class ScreenResult(models.Model):
     job = models.ForeignKey(BackgroundJob, on_delete=models.CASCADE, related_name="screen_results")
@@ -54,3 +58,6 @@ class ScreenResult(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Screen({self.strategy_name} {self.symbol} {self.timeframe})"

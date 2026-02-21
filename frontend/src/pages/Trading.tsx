@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSystemEvents } from "../hooks/useSystemEvents";
 import { useToast } from "../hooks/useToast";
@@ -29,7 +29,9 @@ export function Trading() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [mode, setMode] = useState<TradingMode>("paper");
-  const { isHalted } = useSystemEvents();
+  const { isConnected, isHalted } = useSystemEvents();
+
+  useEffect(() => { document.title = "Trading | Crypto Investor"; }, []);
 
   const ordersQuery = useQuery<Order[]>({
     queryKey: ["orders", mode],
@@ -72,6 +74,20 @@ export function Trading() {
           </button>
         </div>
       </div>
+
+      {/* WebSocket disconnected banner */}
+      {!isConnected && (
+        <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
+          WebSocket disconnected — live order updates and halt notifications are unavailable. Reconnecting...
+        </div>
+      )}
+
+      {/* Orders query error banner */}
+      {ordersQuery.isError && (
+        <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
+          Failed to load orders: {ordersQuery.error instanceof Error ? ordersQuery.error.message : "Unknown error"}
+        </div>
+      )}
 
       {/* Live mode warning banner */}
       {mode === "live" && (

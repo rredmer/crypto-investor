@@ -1,7 +1,6 @@
 """Risk management views."""
 
 from drf_spectacular.utils import extend_schema
-from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -63,10 +62,6 @@ class EquityUpdateView(APIView):
         ser = EquityUpdateSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         equity = ser.validated_data["equity"]
-        if equity < 0:
-            return Response(
-                {"error": "Equity must be non-negative"}, status=status.HTTP_400_BAD_REQUEST
-            )
         return Response(RiskManagementService.update_equity(portfolio_id, equity))
 
 
@@ -81,8 +76,12 @@ class TradeCheckView(APIView):
         ser.is_valid(raise_exception=True)
         d = ser.validated_data
         approved, reason = RiskManagementService.check_trade(
-            portfolio_id, d["symbol"], d["side"], d["size"],
-            d["entry_price"], d.get("stop_loss_price"),
+            portfolio_id,
+            d["symbol"],
+            d["side"],
+            d["size"],
+            d["entry_price"],
+            d.get("stop_loss_price"),
         )
         return Response({"approved": approved, "reason": reason})
 
@@ -97,9 +96,14 @@ class PositionSizeView(APIView):
         ser = PositionSizeRequestSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         d = ser.validated_data
-        return Response(RiskManagementService.calculate_position_size(
-            portfolio_id, d["entry_price"], d["stop_loss_price"], d.get("risk_per_trade"),
-        ))
+        return Response(
+            RiskManagementService.calculate_position_size(
+                portfolio_id,
+                d["entry_price"],
+                d["stop_loss_price"],
+                d.get("risk_per_trade"),
+            )
+        )
 
 
 class ResetDailyView(APIView):
@@ -122,9 +126,7 @@ class HeatCheckView(APIView):
 
 
 class MetricHistoryView(APIView):
-    @extend_schema(
-        responses=RiskMetricHistorySerializer(many=True), tags=["Risk"]
-    )
+    @extend_schema(responses=RiskMetricHistorySerializer(many=True), tags=["Risk"])
     def get(self, request: Request, portfolio_id: int) -> Response:
         hours = _safe_int(request.query_params.get("hours"), 168, min_val=1, max_val=8760)
         entries = RiskManagementService.get_metric_history(portfolio_id, hours)
@@ -148,10 +150,12 @@ class HaltTradingView(APIView):
     def post(self, request: Request, portfolio_id: int) -> Response:
         from asgiref.sync import async_to_sync
 
-        reason = request.data.get("reason", "")
-        result = async_to_sync(
-            RiskManagementService.halt_trading_with_cancellation
-        )(portfolio_id, reason)
+        ser = HaltRequestSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        reason = ser.validated_data["reason"]
+        result = async_to_sync(RiskManagementService.halt_trading_with_cancellation)(
+            portfolio_id, reason
+        )
         return Response(result)
 
 
@@ -160,16 +164,12 @@ class ResumeTradingView(APIView):
     def post(self, request: Request, portfolio_id: int) -> Response:
         from asgiref.sync import async_to_sync
 
-        result = async_to_sync(
-            RiskManagementService.resume_trading_with_broadcast
-        )(portfolio_id)
+        result = async_to_sync(RiskManagementService.resume_trading_with_broadcast)(portfolio_id)
         return Response(result)
 
 
 class AlertListView(APIView):
-    @extend_schema(
-        responses=AlertLogSerializer(many=True), tags=["Risk"]
-    )
+    @extend_schema(responses=AlertLogSerializer(many=True), tags=["Risk"])
     def get(self, request: Request, portfolio_id: int) -> Response:
         limit = _safe_int(request.query_params.get("limit"), 50, max_val=200)
         alerts = RiskManagementService.get_alerts(portfolio_id, limit)
@@ -177,9 +177,7 @@ class AlertListView(APIView):
 
 
 class TradeLogView(APIView):
-    @extend_schema(
-        responses=TradeCheckLogSerializer(many=True), tags=["Risk"]
-    )
+    @extend_schema(responses=TradeCheckLogSerializer(many=True), tags=["Risk"])
     def get(self, request: Request, portfolio_id: int) -> Response:
         limit = _safe_int(request.query_params.get("limit"), 50, max_val=200)
         logs = RiskManagementService.get_trade_log(portfolio_id, limit)

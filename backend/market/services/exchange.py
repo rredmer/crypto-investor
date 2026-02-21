@@ -24,9 +24,7 @@ def _load_db_config(config_id: int | None = None):
 
 
 class ExchangeService:
-    def __init__(
-        self, exchange_id: str | None = None, config_id: int | None = None
-    ) -> None:
+    def __init__(self, exchange_id: str | None = None, config_id: int | None = None) -> None:
         self._db_config = _load_db_config(config_id)
         if self._db_config:
             self._exchange_id = self._db_config.exchange_id
@@ -68,13 +66,15 @@ class ExchangeService:
         for eid in SUPPORTED_EXCHANGES:
             exchange_class = getattr(ccxt, eid)
             ex = exchange_class()
-            result.append({
-                "id": eid,
-                "name": ex.name,
-                "countries": getattr(ex, "countries", []) or [],
-                "has_fetch_tickers": ex.has.get("fetchTickers", False),
-                "has_fetch_ohlcv": ex.has.get("fetchOHLCV", False),
-            })
+            result.append(
+                {
+                    "id": eid,
+                    "name": ex.name,
+                    "countries": getattr(ex, "countries", []) or [],
+                    "has_fetch_tickers": ex.has.get("fetchTickers", False),
+                    "has_fetch_ohlcv": ex.has.get("fetchOHLCV", False),
+                }
+            )
         return result
 
     async def fetch_ticker(self, symbol: str) -> dict:
@@ -105,22 +105,22 @@ class ExchangeService:
             tickers = await exchange.fetch_tickers(symbols)
         result = []
         for ticker in tickers.values():
-            result.append({
-                "symbol": ticker["symbol"],
-                "price": ticker["last"] or 0.0,
-                "volume_24h": ticker.get("quoteVolume") or 0.0,
-                "change_24h": ticker.get("percentage") or 0.0,
-                "high_24h": ticker.get("high") or 0.0,
-                "low_24h": ticker.get("low") or 0.0,
-                "timestamp": datetime.fromtimestamp(
-                    (ticker["timestamp"] or 0) / 1000, tz=timezone.utc
-                ).isoformat(),
-            })
+            result.append(
+                {
+                    "symbol": ticker["symbol"],
+                    "price": ticker["last"] or 0.0,
+                    "volume_24h": ticker.get("quoteVolume") or 0.0,
+                    "change_24h": ticker.get("percentage") or 0.0,
+                    "high_24h": ticker.get("high") or 0.0,
+                    "low_24h": ticker.get("low") or 0.0,
+                    "timestamp": datetime.fromtimestamp(
+                        (ticker["timestamp"] or 0) / 1000, tz=timezone.utc
+                    ).isoformat(),
+                }
+            )
         return result
 
-    async def fetch_ohlcv(
-        self, symbol: str, timeframe: str = "1h", limit: int = 100
-    ) -> list[dict]:
+    async def fetch_ohlcv(self, symbol: str, timeframe: str = "1h", limit: int = 100) -> list[dict]:
         from core.services.metrics import timed
 
         exchange = await self._get_exchange()

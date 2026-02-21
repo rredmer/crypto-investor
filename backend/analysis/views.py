@@ -92,9 +92,7 @@ class BacktestRunView(APIView):
 
 
 class BacktestResultListView(APIView):
-    @extend_schema(
-        responses=BacktestResultSerializer(many=True), tags=["Backtest"]
-    )
+    @extend_schema(responses=BacktestResultSerializer(many=True), tags=["Backtest"])
     def get(self, request: Request) -> Response:
         limit = _safe_int(request.query_params.get("limit"), 20, max_val=100)
         results = BacktestResult.objects.select_related("job").all()[:limit]
@@ -115,9 +113,7 @@ class BacktestResultDetailView(APIView):
 
 
 class BacktestStrategyListView(APIView):
-    @extend_schema(
-        responses=StrategyInfoSerializer(many=True), tags=["Backtest"]
-    )
+    @extend_schema(responses=StrategyInfoSerializer(many=True), tags=["Backtest"])
     def get(self, request: Request) -> Response:
         from analysis.services.backtest import BacktestService
 
@@ -125,9 +121,7 @@ class BacktestStrategyListView(APIView):
 
 
 class BacktestCompareView(APIView):
-    @extend_schema(
-        responses=BacktestResultSerializer(many=True), tags=["Backtest"]
-    )
+    @extend_schema(responses=BacktestResultSerializer(many=True), tags=["Backtest"])
     def get(self, request: Request) -> Response:
         ids_param = request.query_params.get("ids", "")
         id_list = []
@@ -164,9 +158,7 @@ class ScreeningRunView(APIView):
 
 
 class ScreeningResultListView(APIView):
-    @extend_schema(
-        responses=ScreenResultSerializer(many=True), tags=["Screening"]
-    )
+    @extend_schema(responses=ScreenResultSerializer(many=True), tags=["Screening"])
     def get(self, request: Request) -> Response:
         limit = _safe_int(request.query_params.get("limit"), 20, max_val=100)
         results = ScreenResult.objects.select_related("job").all()[:limit]
@@ -192,9 +184,7 @@ class ScreeningStrategyListView(APIView):
 
 
 class DataListView(APIView):
-    @extend_schema(
-        responses=DataFileInfoSerializer(many=True), tags=["Data"]
-    )
+    @extend_schema(responses=DataFileInfoSerializer(many=True), tags=["Data"])
     def get(self, request: Request) -> Response:
         from analysis.services.data_pipeline import DataPipelineService
 
@@ -240,11 +230,14 @@ class DataDownloadView(APIView):
 
 class DataGenerateSampleView(APIView):
     @extend_schema(
-        request={"type": "object", "properties": {
-            "symbols": {"type": "array", "items": {"type": "string"}},
-            "timeframes": {"type": "array", "items": {"type": "string"}},
-            "days": {"type": "integer"},
-        }},
+        request={
+            "type": "object",
+            "properties": {
+                "symbols": {"type": "array", "items": {"type": "string"}},
+                "timeframes": {"type": "array", "items": {"type": "string"}},
+                "days": {"type": "integer"},
+            },
+        },
         responses=JobAcceptedSerializer,
         tags=["Data"],
     )
@@ -315,13 +308,16 @@ class MLModelDetailView(APIView):
 
 class MLPredictView(APIView):
     @extend_schema(
-        request={"type": "object", "properties": {
-            "model_id": {"type": "string"},
-            "symbol": {"type": "string"},
-            "timeframe": {"type": "string"},
-            "exchange": {"type": "string"},
-            "bars": {"type": "integer"},
-        }},
+        request={
+            "type": "object",
+            "properties": {
+                "model_id": {"type": "string"},
+                "symbol": {"type": "string"},
+                "timeframe": {"type": "string"},
+                "exchange": {"type": "string"},
+                "bars": {"type": "integer"},
+            },
+        },
         tags=["ML"],
     )
     def post(self, request: Request) -> Response:

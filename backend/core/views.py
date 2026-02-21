@@ -44,11 +44,13 @@ class PlatformStatusView(APIView):
         # Active jobs
         active_jobs = BackgroundJob.objects.filter(status__in=["pending", "running"]).count()
 
-        return Response({
-            "frameworks": frameworks,
-            "data_files": data_files,
-            "active_jobs": active_jobs,
-        })
+        return Response(
+            {
+                "frameworks": frameworks,
+                "data_files": data_files,
+                "active_jobs": active_jobs,
+            }
+        )
 
 
 class PlatformConfigView(APIView):
@@ -132,12 +134,14 @@ def _get_framework_status() -> list[dict]:
 
     try:
         import vectorbt as vbt
+
         frameworks.append({"name": "VectorBT", "installed": True, "version": vbt.__version__})
     except ImportError:
         frameworks.append({"name": "VectorBT", "installed": False, "version": None})
 
     try:
         import freqtrade
+
         ver = getattr(freqtrade, "__version__", "installed")
         frameworks.append({"name": "Freqtrade", "installed": True, "version": ver})
     except ImportError:
@@ -145,6 +149,7 @@ def _get_framework_status() -> list[dict]:
 
     try:
         import nautilus_trader
+
         ver = getattr(nautilus_trader, "__version__", "installed")
         frameworks.append({"name": "NautilusTrader", "installed": True, "version": ver})
     except ImportError:
@@ -152,12 +157,14 @@ def _get_framework_status() -> list[dict]:
 
     try:
         import ccxt
+
         frameworks.append({"name": "CCXT", "installed": True, "version": ccxt.__version__})
     except ImportError:
         frameworks.append({"name": "CCXT", "installed": False, "version": None})
 
     try:
         import pandas as pd
+
         frameworks.append({"name": "Pandas", "installed": True, "version": pd.__version__})
     except ImportError:
         frameworks.append({"name": "Pandas", "installed": False, "version": None})

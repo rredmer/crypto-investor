@@ -245,18 +245,18 @@ class TestRiskWorkflow:
         # Step 2: Update limits
         resp = authenticated_client.put(
             f"/api/risk/{pid}/limits/",
-            {"max_daily_loss": 500, "max_open_positions": 3},
+            {"max_daily_loss": 0.10, "max_open_positions": 3},
             format="json",
         )
         assert resp.status_code == 200
         updated = resp.json()
-        assert updated["max_daily_loss"] == 500
+        assert updated["max_daily_loss"] == 0.10
         assert updated["max_open_positions"] == 3
 
         # Step 3: Verify persisted
         resp = authenticated_client.get(f"/api/risk/{pid}/limits/")
         assert resp.status_code == 200
-        assert resp.json()["max_daily_loss"] == 500
+        assert resp.json()["max_daily_loss"] == 0.10
         assert resp.json()["max_open_positions"] == 3
 
 
@@ -330,14 +330,10 @@ class TestCrossAppWorkflow:
         pid = 1
 
         # Seed
-        authenticated_client.post(
-            f"/api/risk/{pid}/equity/", {"equity": 10000}, format="json"
-        )
+        authenticated_client.post(f"/api/risk/{pid}/equity/", {"equity": 10000}, format="json")
 
         # Update equity to simulate P&L
-        authenticated_client.post(
-            f"/api/risk/{pid}/equity/", {"equity": 9500}, format="json"
-        )
+        authenticated_client.post(f"/api/risk/{pid}/equity/", {"equity": 9500}, format="json")
 
         # Reset daily
         resp = authenticated_client.post(f"/api/risk/{pid}/reset-daily/")

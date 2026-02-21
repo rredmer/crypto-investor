@@ -31,13 +31,16 @@ def _make_ohlcv(n: int = 500) -> pd.DataFrame:
     np.random.seed(42)
     timestamps = pd.date_range("2025-01-01", periods=n, freq="1h", tz="UTC")
     prices = 42000 * np.exp(np.cumsum(np.random.normal(0, 0.01, n)))
-    return pd.DataFrame({
-        "open": prices * np.random.uniform(0.999, 1.001, n),
-        "high": prices * np.random.uniform(1.001, 1.015, n),
-        "low": prices * np.random.uniform(0.985, 0.999, n),
-        "close": prices,
-        "volume": np.random.lognormal(15, 1, n),
-    }, index=timestamps)
+    return pd.DataFrame(
+        {
+            "open": prices * np.random.uniform(0.999, 1.001, n),
+            "high": prices * np.random.uniform(1.001, 1.015, n),
+            "low": prices * np.random.uniform(0.985, 0.999, n),
+            "close": prices,
+            "volume": np.random.lognormal(15, 1, n),
+        },
+        index=timestamps,
+    )
 
 
 @pytest.fixture

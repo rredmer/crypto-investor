@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { portfoliosApi } from "../api/portfolios";
 import { riskApi } from "../api/risk";
@@ -12,12 +12,14 @@ export function RiskManagement() {
   const { isHalted: wsHalted, haltReason: wsHaltReason } = useSystemEvents();
   const [portfolioId, setPortfolioId] = useState(1);
 
+  useEffect(() => { document.title = "Risk Management | Crypto Investor"; }, []);
+
   const { data: portfolios } = useQuery<Portfolio[]>({
     queryKey: ["portfolios"],
     queryFn: () => portfoliosApi.list(),
   });
 
-  const { data: status } = useQuery<RiskStatus>({
+  const { data: status, isError: statusError } = useQuery<RiskStatus>({
     queryKey: ["risk-status", portfolioId],
     queryFn: () => riskApi.getStatus(portfolioId),
   });
@@ -209,6 +211,17 @@ export function RiskManagement() {
       <div className="mb-6 flex items-center justify-between">
         <h2 className="text-2xl font-bold">Risk Management</h2>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              queryClient.invalidateQueries({ queryKey: ["risk-status", portfolioId] });
+              queryClient.invalidateQueries({ queryKey: ["risk-limits", portfolioId] });
+              queryClient.invalidateQueries({ queryKey: ["risk-heat-check", portfolioId] });
+            }}
+            className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1 text-xs text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface)] hover:text-[var(--color-text)]"
+            title="Refresh status"
+          >
+            &#8635; Refresh
+          </button>
           <label htmlFor="risk-portfolio-id" className="text-sm text-[var(--color-text-muted)]">Portfolio:</label>
           <select
             id="risk-portfolio-id"
@@ -226,6 +239,12 @@ export function RiskManagement() {
           </select>
         </div>
       </div>
+
+      {statusError && (
+        <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
+          Failed to load risk status. Data shown may be stale.
+        </div>
+      )}
 
       {/* Status Cards — 5 columns with Total PnL */}
       <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-5">

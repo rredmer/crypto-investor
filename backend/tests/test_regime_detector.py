@@ -223,8 +223,13 @@ class TestRegimeDetectorSeries:
         detector = RegimeDetector()
         result = detector.detect_series(df)
         expected = {
-            "adx_value", "bb_width_percentile", "ema_slope",
-            "trend_alignment", "price_structure_score", "regime", "confidence",
+            "adx_value",
+            "bb_width_percentile",
+            "ema_slope",
+            "trend_alignment",
+            "price_structure_score",
+            "regime",
+            "confidence",
         }
         assert expected.issubset(set(result.columns))
 
@@ -355,7 +360,8 @@ class TestCompositeScoring:
         result = detector.detect_series(df)
         # With hysteresis=3, regime changes should be less frequent
         regime_changes = sum(
-            1 for i in range(1, len(result))
+            1
+            for i in range(1, len(result))
             if result["regime"].iloc[i] != result["regime"].iloc[i - 1]
             and result["regime"].iloc[i] != Regime.UNKNOWN
             and result["regime"].iloc[i - 1] != Regime.UNKNOWN
@@ -386,7 +392,8 @@ class TestCompositeScoring:
         late_regimes = result["regime"].iloc[-50:].tolist()
         # Should have at least some non-uptrend regime
         non_up = [
-            r for r in late_regimes
+            r
+            for r in late_regimes
             if r not in (Regime.STRONG_TREND_UP, Regime.WEAK_TREND_UP, Regime.UNKNOWN)
         ]
         assert len(non_up) > 0
@@ -401,7 +408,8 @@ class TestCompositeScoring:
 
         def count_changes(series):
             return sum(
-                1 for i in range(1, len(series))
+                1
+                for i in range(1, len(series))
                 if series.iloc[i] != series.iloc[i - 1]
                 and series.iloc[i] != Regime.UNKNOWN
                 and series.iloc[i - 1] != Regime.UNKNOWN

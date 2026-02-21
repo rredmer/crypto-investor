@@ -22,14 +22,18 @@ from trading.services.paper_trading import PaperTradingService
 
 def _make_service(tmp_path: Path) -> PaperTradingService:
     """Create a PaperTradingService with temp log directory."""
-    with patch.object(PaperTradingService, "_read_ft_config", return_value={
-        "api_server": {
-            "listen_ip_address": "127.0.0.1",
-            "listen_port": 8080,
-            "username": "freqtrader",
-            "password": "freqtrader",
-        }
-    }):
+    with patch.object(
+        PaperTradingService,
+        "_read_ft_config",
+        return_value={
+            "api_server": {
+                "listen_ip_address": "127.0.0.1",
+                "listen_port": 8080,
+                "username": "freqtrader",
+                "password": "freqtrader",
+            }
+        },
+    ):
         return PaperTradingService(log_dir=tmp_path)
 
 

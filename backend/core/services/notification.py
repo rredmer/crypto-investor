@@ -43,11 +43,7 @@ class TelegramFormatter:
 
     @staticmethod
     def risk_halt(reason: str, cancelled_count: int) -> str:
-        return (
-            f"<b>TRADING HALTED</b>\n"
-            f"Reason: {reason}\n"
-            f"Cancelled orders: {cancelled_count}"
-        )
+        return f"<b>TRADING HALTED</b>\nReason: {reason}\nCancelled orders: {cancelled_count}"
 
     @staticmethod
     def daily_summary(equity: float, daily_pnl: float, drawdown: float) -> str:
@@ -80,9 +76,7 @@ class NotificationService:
     def _get_preferences(portfolio_id: int):
         from core.models import NotificationPreferences
 
-        prefs, _ = NotificationPreferences.objects.get_or_create(
-            portfolio_id=portfolio_id
-        )
+        prefs, _ = NotificationPreferences.objects.get_or_create(portfolio_id=portfolio_id)
         return prefs
 
     @staticmethod
@@ -112,11 +106,14 @@ class NotificationService:
         url = f"https://api.telegram.org/bot{token}/sendMessage"
         try:
             async with httpx.AsyncClient(timeout=10) as client:
-                resp = await client.post(url, json={
-                    "chat_id": chat_id,
-                    "text": message,
-                    "parse_mode": "HTML",
-                })
+                resp = await client.post(
+                    url,
+                    json={
+                        "chat_id": chat_id,
+                        "text": message,
+                        "parse_mode": "HTML",
+                    },
+                )
                 if resp.status_code == 200:
                     return True, ""
                 return False, f"Telegram API returned {resp.status_code}"
@@ -134,10 +131,13 @@ class NotificationService:
 
         try:
             async with httpx.AsyncClient(timeout=10) as client:
-                resp = await client.post(webhook_url, json={
-                    "event_type": event_type,
-                    "message": message,
-                })
+                resp = await client.post(
+                    webhook_url,
+                    json={
+                        "event_type": event_type,
+                        "message": message,
+                    },
+                )
                 if resp.status_code < 300:
                     return True, ""
                 return False, f"Webhook returned {resp.status_code}"
@@ -157,11 +157,14 @@ class NotificationService:
         url = f"https://api.telegram.org/bot{token}/sendMessage"
         try:
             with httpx.Client(timeout=10) as client:
-                resp = client.post(url, json={
-                    "chat_id": chat_id,
-                    "text": message,
-                    "parse_mode": "HTML",
-                })
+                resp = client.post(
+                    url,
+                    json={
+                        "chat_id": chat_id,
+                        "text": message,
+                        "parse_mode": "HTML",
+                    },
+                )
                 if resp.status_code == 200:
                     return True, ""
                 return False, f"Telegram API returned {resp.status_code}"

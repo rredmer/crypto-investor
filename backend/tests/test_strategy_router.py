@@ -26,9 +26,7 @@ from common.regime.strategy_router import (
 # ── Helpers ──────────────────────────────────────────────────
 
 
-def _make_state(
-    regime: Regime, confidence: float = 0.8, adx: float = 30.0
-) -> RegimeState:
+def _make_state(regime: Regime, confidence: float = 0.8, adx: float = 30.0) -> RegimeState:
     return RegimeState(
         regime=regime,
         confidence=confidence,
@@ -236,9 +234,13 @@ class TestRouterUtilities:
         """HIGH_VOLATILITY with positive alignment → VB (unchanged)."""
         router = StrategyRouter()
         state = RegimeState(
-            regime=Regime.HIGH_VOLATILITY, confidence=0.8, adx_value=20.0,
-            bb_width_percentile=90.0, ema_slope=0.001,
-            trend_alignment=0.3, price_structure_score=0.1,
+            regime=Regime.HIGH_VOLATILITY,
+            confidence=0.8,
+            adx_value=20.0,
+            bb_width_percentile=90.0,
+            ema_slope=0.001,
+            trend_alignment=0.3,
+            price_structure_score=0.1,
         )
         decision = router.route(state)
         assert decision.primary_strategy == VB
@@ -247,9 +249,13 @@ class TestRouterUtilities:
         """HIGH_VOLATILITY with negative alignment → BMR defensive."""
         router = StrategyRouter()
         state = RegimeState(
-            regime=Regime.HIGH_VOLATILITY, confidence=0.8, adx_value=20.0,
-            bb_width_percentile=90.0, ema_slope=-0.005,
-            trend_alignment=-0.5, price_structure_score=-0.3,
+            regime=Regime.HIGH_VOLATILITY,
+            confidence=0.8,
+            adx_value=20.0,
+            bb_width_percentile=90.0,
+            ema_slope=-0.005,
+            trend_alignment=-0.5,
+            price_structure_score=-0.3,
         )
         decision = router.route(state)
         assert decision.primary_strategy == BMR
@@ -258,9 +264,13 @@ class TestRouterUtilities:
         """Bearish HIGH_VOLATILITY should have modifier = 0.5."""
         router = StrategyRouter()
         state = RegimeState(
-            regime=Regime.HIGH_VOLATILITY, confidence=0.8, adx_value=20.0,
-            bb_width_percentile=90.0, ema_slope=-0.005,
-            trend_alignment=-0.5, price_structure_score=-0.3,
+            regime=Regime.HIGH_VOLATILITY,
+            confidence=0.8,
+            adx_value=20.0,
+            bb_width_percentile=90.0,
+            ema_slope=-0.005,
+            trend_alignment=-0.5,
+            price_structure_score=-0.3,
         )
         decision = router.route(state)
         assert decision.position_size_modifier == 0.5
@@ -269,9 +279,13 @@ class TestRouterUtilities:
         """HIGH_VOLATILITY with zero alignment → VB (unchanged)."""
         router = StrategyRouter()
         state = RegimeState(
-            regime=Regime.HIGH_VOLATILITY, confidence=0.8, adx_value=20.0,
-            bb_width_percentile=90.0, ema_slope=0.0,
-            trend_alignment=0.0, price_structure_score=0.0,
+            regime=Regime.HIGH_VOLATILITY,
+            confidence=0.8,
+            adx_value=20.0,
+            bb_width_percentile=90.0,
+            ema_slope=0.0,
+            trend_alignment=0.0,
+            price_structure_score=0.0,
         )
         decision = router.route(state)
         assert decision.primary_strategy == VB

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { paperTradingApi } from "../api/paperTrading";
 import { backtestApi } from "../api/backtest";
@@ -17,7 +17,9 @@ export function PaperTrading() {
   const { toast } = useToast();
   const [selectedStrategy, setSelectedStrategy] = useState("CryptoInvestorV1");
 
-  const { data: status } = useQuery<PaperTradingStatus>({
+  useEffect(() => { document.title = "Paper Trading | Crypto Investor"; }, []);
+
+  const { data: status, isError: statusError } = useQuery<PaperTradingStatus>({
     queryKey: ["paper-trading-status"],
     queryFn: paperTradingApi.status,
     refetchInterval: 5000,
@@ -137,6 +139,12 @@ export function PaperTrading() {
       {startMutation.error && (
         <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
           {startMutation.error.message}
+        </div>
+      )}
+
+      {statusError && (
+        <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
+          Failed to connect to paper trading service. Status may be unavailable.
         </div>
       )}
 

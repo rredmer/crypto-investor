@@ -18,16 +18,28 @@ class TestHaltWithCancellation:
     async def test_halt_cancels_open_live_orders(self):
         now = timezone.now()
         await sync_to_async(Order.objects.create)(
-            exchange_id="binance", symbol="BTC/USDT", side="buy",
-            order_type="market", amount=0.1, mode=TradingMode.LIVE,
-            status=OrderStatus.SUBMITTED, exchange_order_id="EX-1",
-            portfolio_id=1, timestamp=now,
+            exchange_id="binance",
+            symbol="BTC/USDT",
+            side="buy",
+            order_type="market",
+            amount=0.1,
+            mode=TradingMode.LIVE,
+            status=OrderStatus.SUBMITTED,
+            exchange_order_id="EX-1",
+            portfolio_id=1,
+            timestamp=now,
         )
         await sync_to_async(Order.objects.create)(
-            exchange_id="binance", symbol="ETH/USDT", side="sell",
-            order_type="limit", amount=1.0, mode=TradingMode.LIVE,
-            status=OrderStatus.OPEN, exchange_order_id="EX-2",
-            portfolio_id=1, timestamp=now,
+            exchange_id="binance",
+            symbol="ETH/USDT",
+            side="sell",
+            order_type="limit",
+            amount=1.0,
+            mode=TradingMode.LIVE,
+            status=OrderStatus.OPEN,
+            exchange_order_id="EX-2",
+            portfolio_id=1,
+            timestamp=now,
         )
 
         mock_exchange = AsyncMock()
@@ -109,9 +121,14 @@ class TestOrderRejectionDuringHalt:
         from trading.services.live_trading import LiveTradingService
 
         order = await sync_to_async(Order.objects.create)(
-            exchange_id="binance", symbol="BTC/USDT", side="buy",
-            order_type="market", amount=0.1, mode=TradingMode.LIVE,
-            portfolio_id=1, timestamp=timezone.now(),
+            exchange_id="binance",
+            symbol="BTC/USDT",
+            side="buy",
+            order_type="market",
+            amount=0.1,
+            mode=TradingMode.LIVE,
+            portfolio_id=1,
+            timestamp=timezone.now(),
         )
 
         with patch(

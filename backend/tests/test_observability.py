@@ -53,9 +53,7 @@ class TestRequestIDMiddleware:
         assert len(resp["X-Request-ID"]) == 12
 
     def test_respects_incoming_request_id(self, authenticated_client):
-        resp = authenticated_client.get(
-            "/api/health/", HTTP_X_REQUEST_ID="custom-rid-123"
-        )
+        resp = authenticated_client.get("/api/health/", HTTP_X_REQUEST_ID="custom-rid-123")
         assert resp["X-Request-ID"] == "custom-rid-123"
 
     def test_different_requests_get_different_ids(self, authenticated_client):
@@ -79,8 +77,13 @@ class TestJSONFormatter:
 
         formatter = JSONFormatter()
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="", lineno=0,
-            msg="hello world", args=(), exc_info=None,
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="hello world",
+            args=(),
+            exc_info=None,
         )
         output = formatter.format(record)
         parsed = json.loads(output)
@@ -93,8 +96,13 @@ class TestJSONFormatter:
 
         formatter = JSONFormatter()
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="", lineno=0,
-            msg="ts test", args=(), exc_info=None,
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="ts test",
+            args=(),
+            exc_info=None,
         )
         output = formatter.format(record)
         parsed = json.loads(output)
@@ -108,8 +116,13 @@ class TestJSONFormatter:
         try:
             formatter = JSONFormatter()
             record = logging.LogRecord(
-                name="test", level=logging.INFO, pathname="", lineno=0,
-                msg="with rid", args=(), exc_info=None,
+                name="test",
+                level=logging.INFO,
+                pathname="",
+                lineno=0,
+                msg="with rid",
+                args=(),
+                exc_info=None,
             )
             output = formatter.format(record)
             parsed = json.loads(output)
@@ -122,8 +135,13 @@ class TestJSONFormatter:
 
         formatter = JSONFormatter()
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="", lineno=0,
-            msg="extra", args=(), exc_info=None,
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="extra",
+            args=(),
+            exc_info=None,
         )
         record.method = "GET"
         record.path = "/api/test/"
@@ -144,8 +162,13 @@ class TestJSONFormatter:
             import sys
 
             record = logging.LogRecord(
-                name="test", level=logging.ERROR, pathname="", lineno=0,
-                msg="error", args=(), exc_info=sys.exc_info(),
+                name="test",
+                level=logging.ERROR,
+                pathname="",
+                lineno=0,
+                msg="error",
+                args=(),
+                exc_info=sys.exc_info(),
             )
         output = formatter.format(record)
         parsed = json.loads(output)

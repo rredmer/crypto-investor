@@ -20,9 +20,7 @@ class Portfolio(models.Model):
 
 
 class Holding(models.Model):
-    portfolio = models.ForeignKey(
-        Portfolio, on_delete=models.CASCADE, related_name="holdings"
-    )
+    portfolio = models.ForeignKey(Portfolio, on_delete=models.CASCADE, related_name="holdings")
     symbol = models.CharField(max_length=20, db_index=True)
     amount = models.FloatField(default=0.0)
     avg_buy_price = models.FloatField(default=0.0)

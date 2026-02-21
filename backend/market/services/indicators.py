@@ -7,12 +7,31 @@ from core.platform_bridge import ensure_platform_imports
 logger = logging.getLogger("indicator_service")
 
 AVAILABLE_INDICATORS = [
-    "sma_7", "sma_14", "sma_21", "sma_50", "sma_100", "sma_200",
-    "ema_7", "ema_14", "ema_21", "ema_50", "ema_100", "ema_200",
-    "rsi_14", "macd", "macd_signal", "macd_hist",
-    "bb_upper", "bb_mid", "bb_lower",
-    "atr_14", "stoch_k", "stoch_d",
-    "obv", "volume_sma_20", "volume_ratio",
+    "sma_7",
+    "sma_14",
+    "sma_21",
+    "sma_50",
+    "sma_100",
+    "sma_200",
+    "ema_7",
+    "ema_14",
+    "ema_21",
+    "ema_50",
+    "ema_100",
+    "ema_200",
+    "rsi_14",
+    "macd",
+    "macd_signal",
+    "macd_hist",
+    "bb_upper",
+    "bb_mid",
+    "bb_lower",
+    "atr_14",
+    "stoch_k",
+    "stoch_d",
+    "obv",
+    "volume_sma_20",
+    "volume_ratio",
 ]
 
 

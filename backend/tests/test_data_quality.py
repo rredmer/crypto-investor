@@ -50,9 +50,16 @@ def _make_ohlcv(n=100, timeframe="1h", start=None, freq=None):
     high = np.maximum(high, np.maximum(open_, close))
     low = np.minimum(low, np.minimum(open_, close))
 
-    return pd.DataFrame({
-        "open": open_, "high": high, "low": low, "close": close, "volume": volume,
-    }, index=index)
+    return pd.DataFrame(
+        {
+            "open": open_,
+            "high": high,
+            "low": low,
+            "close": close,
+            "volume": volume,
+        },
+        index=index,
+    )
 
 
 # ── Gap Detection ────────────────────────────────────────────────

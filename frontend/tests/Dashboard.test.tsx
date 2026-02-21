@@ -62,6 +62,17 @@ const mockJobs = [
   },
 ];
 
+const mockRiskStatus = {
+  equity: 10000,
+  peak_equity: 10500,
+  drawdown: 0.048,
+  daily_pnl: 125.50,
+  total_pnl: 500.00,
+  open_positions: 2,
+  is_halted: false,
+  halt_reason: "",
+};
+
 beforeEach(() => {
   vi.stubGlobal(
     "fetch",
@@ -71,6 +82,7 @@ beforeEach(() => {
       "/api/portfolios": mockPortfolios,
       "/api/regime/current": mockRegimeStates,
       "/api/jobs": mockJobs,
+      "/api/risk/1/status/": mockRiskStatus,
     }),
   );
 });

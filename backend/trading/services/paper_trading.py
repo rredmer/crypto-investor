@@ -65,13 +65,23 @@ class PaperTradingService:
             return {"status": "error", "error": "Freqtrade config.json not found"}
 
         cmd = [
-            sys.executable, "-m", "freqtrade", "trade",
-            "--config", str(ft_config), "--strategy", strategy,
-            "--strategy-path", str(strat_path),
+            sys.executable,
+            "-m",
+            "freqtrade",
+            "trade",
+            "--config",
+            str(ft_config),
+            "--strategy",
+            strategy,
+            "--strategy-path",
+            str(strat_path),
         ]
         try:
             self._process = subprocess.Popen(
-                cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=str(PROJECT_ROOT),
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=str(PROJECT_ROOT),
             )
         except FileNotFoundError:
             return {"status": "error", "error": "Python or Freqtrade not found"}
@@ -84,8 +94,10 @@ class PaperTradingService:
         self._log_event("started", {"strategy": strategy, "pid": self._process.pid})
         logger.info(f"Paper trading started: {strategy} (PID {self._process.pid})")
         return {
-            "status": "started", "strategy": strategy,
-            "pid": self._process.pid, "started_at": self._started_at.isoformat(),
+            "status": "started",
+            "strategy": strategy,
+            "pid": self._process.pid,
+            "started_at": self._started_at.isoformat(),
         }
 
     def stop(self) -> dict:
@@ -115,14 +127,18 @@ class PaperTradingService:
                 exit_code = self._process.poll()
                 self._process = None
             return {
-                "running": False, "strategy": self._strategy or None,
-                "uptime_seconds": 0, "exit_code": exit_code,
+                "running": False,
+                "strategy": self._strategy or None,
+                "uptime_seconds": 0,
+                "exit_code": exit_code,
             }
 
         uptime = (datetime.now(timezone.utc) - self._started_at).total_seconds()
         return {
-            "running": True, "strategy": self._strategy,
-            "pid": self._process.pid, "started_at": self._started_at.isoformat(),
+            "running": True,
+            "strategy": self._strategy,
+            "pid": self._process.pid,
+            "started_at": self._started_at.isoformat(),
             "uptime_seconds": round(uptime),
         }
 
@@ -193,7 +209,8 @@ class PaperTradingService:
     def _log_event(self, event: str, data: dict | None = None) -> None:
         entry = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "event": event, **(data or {}),
+            "event": event,
+            **(data or {}),
         }
         try:
             with open(self._log_path, "a") as f:

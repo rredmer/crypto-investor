@@ -112,9 +112,7 @@ class Order(models.Model):
         """
         allowed = VALID_TRANSITIONS.get(self.status, set())
         if new_status not in allowed:
-            raise ValueError(
-                f"Invalid transition: {self.status} -> {new_status}"
-            )
+            raise ValueError(f"Invalid transition: {self.status} -> {new_status}")
 
         self.status = new_status
         now = timezone.now()
@@ -134,9 +132,7 @@ class Order(models.Model):
 
 
 class OrderFillEvent(models.Model):
-    order = models.ForeignKey(
-        Order, on_delete=models.CASCADE, related_name="fill_events"
-    )
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="fill_events")
     fill_price = models.FloatField()
     fill_amount = models.FloatField()
     fee = models.FloatField(default=0.0)

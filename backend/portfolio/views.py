@@ -22,7 +22,9 @@ class PortfolioListView(APIView):
         return Response(PortfolioSerializer(portfolios, many=True).data)
 
     @extend_schema(
-        request=PortfolioCreateSerializer, responses=PortfolioSerializer, tags=["Portfolio"],
+        request=PortfolioCreateSerializer,
+        responses=PortfolioSerializer,
+        tags=["Portfolio"],
     )
     def post(self, request: Request) -> Response:
         ser = PortfolioCreateSerializer(data=request.data)
@@ -44,7 +46,9 @@ class PortfolioDetailView(APIView):
         return Response(PortfolioSerializer(portfolio).data)
 
     @extend_schema(
-        request=PortfolioUpdateSerializer, responses=PortfolioSerializer, tags=["Portfolio"],
+        request=PortfolioUpdateSerializer,
+        responses=PortfolioSerializer,
+        tags=["Portfolio"],
     )
     def put(self, request: Request, portfolio_id: int) -> Response:
         try:
@@ -59,7 +63,9 @@ class PortfolioDetailView(APIView):
         return Response(PortfolioSerializer(portfolio).data)
 
     @extend_schema(
-        request=PortfolioUpdateSerializer, responses=PortfolioSerializer, tags=["Portfolio"],
+        request=PortfolioUpdateSerializer,
+        responses=PortfolioSerializer,
+        tags=["Portfolio"],
     )
     def patch(self, request: Request, portfolio_id: int) -> Response:
         try:
@@ -85,7 +91,9 @@ class PortfolioDetailView(APIView):
 
 class HoldingDetailView(APIView):
     @extend_schema(
-        request=HoldingUpdateSerializer, responses=HoldingSerializer, tags=["Portfolio"],
+        request=HoldingUpdateSerializer,
+        responses=HoldingSerializer,
+        tags=["Portfolio"],
     )
     def put(self, request: Request, portfolio_id: int, holding_id: int) -> Response:
         try:
@@ -111,7 +119,9 @@ class HoldingDetailView(APIView):
 
 class HoldingCreateView(APIView):
     @extend_schema(
-        request=HoldingCreateSerializer, responses=HoldingSerializer, tags=["Portfolio"],
+        request=HoldingCreateSerializer,
+        responses=HoldingSerializer,
+        tags=["Portfolio"],
     )
     def post(self, request: Request, portfolio_id: int) -> Response:
         try:

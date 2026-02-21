@@ -39,9 +39,7 @@ class TestEncryptedTextField:
 
     def test_empty_string_not_encrypted(self):
         """Empty strings should pass through unchanged."""
-        config = ExchangeConfig.objects.create(
-            name="Test", exchange_id="binance", api_key=""
-        )
+        config = ExchangeConfig.objects.create(name="Test", exchange_id="binance", api_key="")
         config.refresh_from_db()
         assert config.api_key == ""
 
@@ -59,7 +57,8 @@ class TestExchangeConfigAPISecurity:
     def test_credentials_not_in_response(self, authenticated_client):
         """API response must never contain raw credentials."""
         ExchangeConfig.objects.create(
-            name="Test", exchange_id="binance",
+            name="Test",
+            exchange_id="binance",
             api_key="super-secret-key-abc123",
             api_secret="super-secret-secret-xyz",
             passphrase="my-passphrase",
@@ -74,7 +73,8 @@ class TestExchangeConfigAPISecurity:
     def test_masked_key_format(self, authenticated_client):
         """Masked key should show first4****last4."""
         ExchangeConfig.objects.create(
-            name="Test", exchange_id="binance",
+            name="Test",
+            exchange_id="binance",
             api_key="abcdefghijklmnop",
         )
         resp = authenticated_client.get("/api/exchange-configs/")
@@ -83,9 +83,7 @@ class TestExchangeConfigAPISecurity:
 
     def test_short_key_masked_as_stars(self, authenticated_client):
         """Keys 8 chars or fewer are masked as ****."""
-        ExchangeConfig.objects.create(
-            name="Test", exchange_id="binance", api_key="short"
-        )
+        ExchangeConfig.objects.create(name="Test", exchange_id="binance", api_key="short")
         resp = authenticated_client.get("/api/exchange-configs/")
         data = resp.json()[0]
         assert data["api_key_masked"] == "****"
@@ -93,8 +91,10 @@ class TestExchangeConfigAPISecurity:
     def test_has_credential_booleans(self, authenticated_client):
         """has_api_key, has_api_secret, has_passphrase booleans exposed."""
         ExchangeConfig.objects.create(
-            name="Test", exchange_id="binance",
-            api_key="key123456789", api_secret="secret123",
+            name="Test",
+            exchange_id="binance",
+            api_key="key123456789",
+            api_secret="secret123",
         )
         resp = authenticated_client.get("/api/exchange-configs/")
         data = resp.json()[0]
@@ -154,8 +154,10 @@ class TestExchangeConfigCRUD:
     def test_partial_update_preserves_credentials(self, authenticated_client):
         """Updating name without sending credentials should keep them."""
         config = ExchangeConfig.objects.create(
-            name="Old", exchange_id="binance",
-            api_key="keep-this-key-123", api_secret="keep-this-secret",
+            name="Old",
+            exchange_id="binance",
+            api_key="keep-this-key-123",
+            api_secret="keep-this-secret",
         )
         authenticated_client.put(
             f"/api/exchange-configs/{config.pk}/",
@@ -184,12 +186,8 @@ class TestExchangeConfigCRUD:
 class TestExchangeConfigDefault:
     def test_only_one_default(self):
         """Setting a new default should unset the previous one."""
-        a = ExchangeConfig.objects.create(
-            name="A", exchange_id="binance", is_default=True
-        )
-        b = ExchangeConfig.objects.create(
-            name="B", exchange_id="kraken", is_default=True
-        )
+        a = ExchangeConfig.objects.create(name="A", exchange_id="binance", is_default=True)
+        b = ExchangeConfig.objects.create(name="B", exchange_id="kraken", is_default=True)
         a.refresh_from_db()
         assert a.is_default is False
         assert b.is_default is True
@@ -212,9 +210,7 @@ class TestExchangeConfigTest:
         mock_exchange.set_sandbox_mode = MagicMock()
 
         with patch("ccxt.async_support.binance", return_value=mock_exchange):
-            resp = authenticated_client.post(
-                f"/api/exchange-configs/{config.pk}/test/"
-            )
+            resp = authenticated_client.post(f"/api/exchange-configs/{config.pk}/test/")
 
         assert resp.status_code == 200
         data = resp.json()

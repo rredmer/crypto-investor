@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   exchangeConfigsApi,
@@ -325,8 +325,10 @@ export function Settings() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  useEffect(() => { document.title = "Settings | Crypto Investor"; }, []);
+
   // Exchange configs
-  const { data: configs } = useQuery({
+  const { data: configs, isError: configsError } = useQuery({
     queryKey: ["exchange-configs"],
     queryFn: exchangeConfigsApi.list,
   });
@@ -343,12 +345,20 @@ export function Settings() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [testingId, setTestingId] = useState<number | null>(null);
   const [testResult, setTestResult] = useState<ExchangeTestResult | null>(null);
+  const [showSaved, setShowSaved] = useState(false);
+
+  useEffect(() => {
+    if (!showSaved) return;
+    const timer = setTimeout(() => setShowSaved(false), 3000);
+    return () => clearTimeout(timer);
+  }, [showSaved]);
 
   const createMutation = useMutation({
     mutationFn: exchangeConfigsApi.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["exchange-configs"] });
       setShowAddExchange(false);
+      setShowSaved(true);
       toast("Exchange config created", "success");
     },
     onError: (err) => toast((err as Error).message || "Failed to create exchange config", "error"),
@@ -360,6 +370,7 @@ export function Settings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["exchange-configs"] });
       setEditingId(null);
+      setShowSaved(true);
       toast("Exchange config updated", "success");
     },
     onError: (err) => toast((err as Error).message || "Failed to update exchange config", "error"),
@@ -417,6 +428,18 @@ export function Settings() {
   return (
     <div>
       <h2 className="mb-6 text-2xl font-bold">Settings</h2>
+
+      {configsError && (
+        <div className="mb-4 max-w-2xl rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
+          Failed to load exchange configurations.
+        </div>
+      )}
+
+      {showSaved && (
+        <div className="mb-4 max-w-2xl rounded-lg border border-green-500/30 bg-green-500/10 p-3 text-sm text-green-400">
+          Exchange configuration saved successfully.
+        </div>
+      )}
 
       <div className="max-w-2xl space-y-6">
         {/* Exchange Connections */}

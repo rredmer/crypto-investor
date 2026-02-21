@@ -127,8 +127,10 @@ class AuthStatusView(APIView):
 
     def get(self, request: Request) -> Response:
         if request.user.is_authenticated:
-            return Response({
-                "authenticated": True,
-                "username": request.user.username,
-            })
+            return Response(
+                {
+                    "authenticated": True,
+                    "username": request.user.username,
+                }
+            )
         return Response({"authenticated": False})

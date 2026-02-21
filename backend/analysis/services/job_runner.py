@@ -46,7 +46,10 @@ class JobRunner:
 
         job_id = str(uuid.uuid4())
         BackgroundJob.objects.create(
-            id=job_id, job_type=job_type, status="pending", params=params,
+            id=job_id,
+            job_type=job_type,
+            status="pending",
+            params=params,
         )
         _job_progress[job_id] = {"progress": 0.0, "progress_message": "Queued"}
         self._executor.submit(self._run_job, job_id, run_fn, params or {})
@@ -60,7 +63,8 @@ class JobRunner:
 
         try:
             BackgroundJob.objects.filter(id=job_id).update(
-                status="running", started_at=datetime.now(timezone.utc),
+                status="running",
+                started_at=datetime.now(timezone.utc),
             )
             _job_progress[job_id] = {"progress": 0.0, "progress_message": "Running"}
 
@@ -99,7 +103,8 @@ class JobRunner:
             logger.exception(f"Job {job_id} failed: {e}")
             _job_progress[job_id] = {"progress": 0.0, "progress_message": f"Failed: {e}"}
             BackgroundJob.objects.filter(id=job_id).update(
-                status="failed", error=str(e),
+                status="failed",
+                error=str(e),
                 completed_at=datetime.now(timezone.utc),
             )
 
@@ -112,6 +117,7 @@ class JobRunner:
         from analysis.models import BackgroundJob
 
         updated = BackgroundJob.objects.filter(
-            id=job_id, status__in=["pending", "running"],
+            id=job_id,
+            status__in=["pending", "running"],
         ).update(status="cancelled", completed_at=datetime.now(timezone.utc))
         return updated > 0

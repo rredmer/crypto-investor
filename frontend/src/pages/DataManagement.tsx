@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { dataApi } from "../api/data";
 import { useJobPolling } from "../hooks/useJobPolling";
@@ -12,13 +12,15 @@ const TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h", "1d"];
 export function DataManagement() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  useEffect(() => { document.title = "Data Management | Crypto Investor"; }, []);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [downloadSymbols, setDownloadSymbols] = useState(DEFAULT_SYMBOLS.join(", "));
   const [downloadTimeframes, setDownloadTimeframes] = useState(["1h"]);
   const [downloadExchange, setDownloadExchange] = useState("binance");
   const [downloadDays, setDownloadDays] = useState(90);
 
-  const { data: files, isLoading } = useQuery<DataFileInfo[]>({
+  const { data: files, isLoading, isError: filesError } = useQuery<DataFileInfo[]>({
     queryKey: ["data-files"],
     queryFn: dataApi.list,
   });
@@ -197,13 +199,25 @@ export function DataManagement() {
 
       {/* Data Files Table */}
       <div className="mt-6 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
-        <h3 className="mb-4 text-lg font-semibold">Available Data</h3>
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-lg font-semibold">Available Data</h3>
+          <button
+            onClick={() => queryClient.invalidateQueries({ queryKey: ["data-files"] })}
+            className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1 text-xs text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface)] hover:text-[var(--color-text)]"
+            title="Refresh files"
+          >
+            &#8635; Refresh
+          </button>
+        </div>
         {isLoading && (
           <div className="space-y-2">
             {[1, 2, 3].map((i) => (
               <div key={i} className="h-10 animate-pulse rounded bg-[var(--color-border)]" />
             ))}
           </div>
+        )}
+        {filesError && (
+          <p className="text-sm text-red-400">Failed to load data files.</p>
         )}
         {files && files.length === 0 && (
           <p className="text-sm text-[var(--color-text-muted)]">

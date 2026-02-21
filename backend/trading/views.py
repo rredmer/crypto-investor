@@ -1,3 +1,5 @@
+import threading
+import time
 from datetime import datetime, timezone
 
 from asgiref.sync import async_to_sync
@@ -11,20 +13,31 @@ from core.utils import safe_int as _safe_int
 from trading.models import Order, OrderStatus, TradingMode
 from trading.serializers import OrderCreateSerializer, OrderSerializer
 
+# Cached exchange connectivity check for LiveTradingStatusView
+_exchange_check_cache: dict[str, object] = {
+    "ok": False,
+    "error": "",
+    "checked_at": 0.0,
+}
+_exchange_check_ttl = 30  # seconds
+_exchange_check_lock = threading.Lock()
+
 
 class OrderListView(APIView):
     @extend_schema(responses=OrderSerializer(many=True), tags=["Trading"])
     def get(self, request: Request) -> Response:
         limit = _safe_int(request.query_params.get("limit"), 50, max_val=200)
         mode = request.query_params.get("mode")
-        qs = Order.objects.all()
+        qs = Order.objects.prefetch_related("fill_events").all()
         if mode in ("paper", "live"):
             qs = qs.filter(mode=mode)
         orders = qs[:limit]
         return Response(OrderSerializer(orders, many=True).data)
 
     @extend_schema(
-        request=OrderCreateSerializer, responses=OrderSerializer, tags=["Trading"],
+        request=OrderCreateSerializer,
+        responses=OrderSerializer,
+        tags=["Trading"],
     )
     def post(self, request: Request) -> Response:
         ser = OrderCreateSerializer(data=request.data)
@@ -49,20 +62,16 @@ class OrderListView(APIView):
             order = async_to_sync(LiveTradingService.submit_order)(order)
             async_to_sync(start_order_sync)()
 
-        return Response(
-            OrderSerializer(order).data, status=status.HTTP_201_CREATED
-        )
+        return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
 
 
 class OrderDetailView(APIView):
     @extend_schema(responses=OrderSerializer, tags=["Trading"])
     def get(self, request: Request, order_id: int) -> Response:
         try:
-            order = Order.objects.get(id=order_id)
+            order = Order.objects.prefetch_related("fill_events").get(id=order_id)
         except Order.DoesNotExist:
-            return Response(
-                {"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
         return Response(OrderSerializer(order).data)
 
 
@@ -72,13 +81,13 @@ class OrderCancelView(APIView):
         try:
             order = Order.objects.get(id=order_id)
         except Order.DoesNotExist:
-            return Response(
-                {"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
 
         terminal = {
-            OrderStatus.FILLED, OrderStatus.CANCELLED,
-            OrderStatus.REJECTED, OrderStatus.ERROR,
+            OrderStatus.FILLED,
+            OrderStatus.CANCELLED,
+            OrderStatus.REJECTED,
+            OrderStatus.ERROR,
         }
         if order.status in terminal:
             return Response(
@@ -99,7 +108,6 @@ class OrderCancelView(APIView):
 class LiveTradingStatusView(APIView):
     @extend_schema(tags=["Trading"])
     def get(self, request: Request) -> Response:
-        from market.services.exchange import ExchangeService
         from risk.models import RiskState
 
         portfolio_id = _safe_int(request.query_params.get("portfolio_id"), 1)
@@ -107,8 +115,40 @@ class LiveTradingStatusView(APIView):
         state = RiskState.objects.filter(portfolio_id=portfolio_id).first()
         is_halted = state.is_halted if state else False
 
-        exchange_ok = False
-        exchange_error = ""
+        # Use cached exchange connectivity check (TTL-based)
+        exchange_ok, exchange_error = _get_cached_exchange_status()
+
+        active_count = Order.objects.filter(
+            mode=TradingMode.LIVE,
+            status__in=[
+                OrderStatus.SUBMITTED,
+                OrderStatus.OPEN,
+                OrderStatus.PARTIAL_FILL,
+            ],
+        ).count()
+
+        return Response(
+            {
+                "exchange_connected": exchange_ok,
+                "exchange_error": exchange_error,
+                "is_halted": is_halted,
+                "active_live_orders": active_count,
+            }
+        )
+
+
+def _get_cached_exchange_status() -> tuple[bool, str]:
+    """Return cached exchange connectivity status, refreshing if TTL expired."""
+    now = time.monotonic()
+    if now - _exchange_check_cache["checked_at"] < _exchange_check_ttl:
+        return _exchange_check_cache["ok"], _exchange_check_cache["error"]
+
+    with _exchange_check_lock:
+        # Double-check after acquiring lock
+        if now - _exchange_check_cache["checked_at"] < _exchange_check_ttl:
+            return _exchange_check_cache["ok"], _exchange_check_cache["error"]
+
+        from market.services.exchange import ExchangeService
 
         async def _check_exchange():
             service = ExchangeService()
@@ -121,22 +161,11 @@ class LiveTradingStatusView(APIView):
             finally:
                 await service.close()
 
-        exchange_ok, exchange_error = async_to_sync(_check_exchange)()
-
-        active_count = Order.objects.filter(
-            mode=TradingMode.LIVE,
-            status__in=[
-                OrderStatus.SUBMITTED, OrderStatus.OPEN,
-                OrderStatus.PARTIAL_FILL,
-            ],
-        ).count()
-
-        return Response({
-            "exchange_connected": exchange_ok,
-            "exchange_error": exchange_error,
-            "is_halted": is_halted,
-            "active_live_orders": active_count,
-        })
+        ok, error = async_to_sync(_check_exchange)()
+        _exchange_check_cache["ok"] = ok
+        _exchange_check_cache["error"] = error
+        _exchange_check_cache["checked_at"] = time.monotonic()
+        return ok, error
 
 
 class PaperTradingStatusView(APIView):

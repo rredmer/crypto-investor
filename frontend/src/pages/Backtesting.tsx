@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { backtestApi } from "../api/backtest";
 import { useJobPolling } from "../hooks/useJobPolling";
 import { useToast } from "../hooks/useToast";
@@ -8,7 +8,10 @@ import { EquityCurve } from "../components/EquityCurve";
 import type { BacktestResult, StrategyInfo } from "../types";
 
 export function Backtesting() {
+  const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  useEffect(() => { document.title = "Backtesting | Crypto Investor"; }, []);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [framework, setFramework] = useState("freqtrade");
   const [strategy, setStrategy] = useState("");
@@ -17,12 +20,12 @@ export function Backtesting() {
   const [timerange, setTimerange] = useState("");
   const [exchange, setExchange] = useState("binance");
 
-  const { data: strategies } = useQuery<StrategyInfo[]>({
+  const { data: strategies, isError: strategiesError } = useQuery<StrategyInfo[]>({
     queryKey: ["backtest-strategies"],
     queryFn: backtestApi.strategies,
   });
 
-  const { data: history } = useQuery<BacktestResult[]>({
+  const { data: history, isLoading: historyLoading, isError: historyError } = useQuery<BacktestResult[]>({
     queryKey: ["backtest-results"],
     queryFn: () => backtestApi.results(10),
   });
@@ -46,6 +49,12 @@ export function Backtesting() {
   return (
     <div>
       <h2 className="mb-6 text-2xl font-bold">Backtesting</h2>
+
+      {(strategiesError || historyError) && (
+        <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
+          Failed to load {strategiesError ? "strategies" : "backtest history"}. Some features may be unavailable.
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
         {/* Config Form */}
@@ -203,9 +212,28 @@ export function Backtesting() {
           )}
 
           {/* History */}
-          {history && history.length > 0 && (
+          {historyLoading && (
             <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
               <h3 className="mb-4 text-lg font-semibold">History</h3>
+              <div className="space-y-2">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="h-10 animate-pulse rounded bg-[var(--color-border)]" />
+                ))}
+              </div>
+            </div>
+          )}
+          {history && history.length > 0 && (
+            <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-lg font-semibold">History</h3>
+                <button
+                  onClick={() => queryClient.invalidateQueries({ queryKey: ["backtest-results"] })}
+                  className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1 text-xs text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface)] hover:text-[var(--color-text)]"
+                  title="Refresh history"
+                >
+                  &#8635; Refresh
+                </button>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead>
@@ -214,6 +242,10 @@ export function Backtesting() {
                       <th className="pb-2 pr-4">Strategy</th>
                       <th className="pb-2 pr-4">Symbol</th>
                       <th className="pb-2 pr-4">Timeframe</th>
+                      <th className="pb-2 pr-4 text-right">Sharpe</th>
+                      <th className="pb-2 pr-4 text-right">Max DD</th>
+                      <th className="pb-2 pr-4 text-right">Win Rate</th>
+                      <th className="pb-2 pr-4 text-right">Trades</th>
                       <th className="pb-2">Date</th>
                     </tr>
                   </thead>
@@ -221,9 +253,21 @@ export function Backtesting() {
                     {history.map((r) => (
                       <tr key={r.id} className="border-b border-[var(--color-border)] last:border-0">
                         <td className="py-2 pr-4 capitalize">{r.framework}</td>
-                        <td className="py-2 pr-4 font-medium">{r.strategy_name}</td>
+                        <td className="truncate max-w-[200px] py-2 pr-4 font-medium" title={r.strategy_name}>{r.strategy_name}</td>
                         <td className="py-2 pr-4">{r.symbol}</td>
                         <td className="py-2 pr-4">{r.timeframe}</td>
+                        <td className="py-2 pr-4 text-right font-mono text-xs">
+                          {typeof r.metrics?.sharpe_ratio === "number" ? r.metrics.sharpe_ratio.toFixed(2) : "—"}
+                        </td>
+                        <td className="py-2 pr-4 text-right font-mono text-xs">
+                          {typeof r.metrics?.max_drawdown === "number" ? `${(r.metrics.max_drawdown * 100).toFixed(1)}%` : "—"}
+                        </td>
+                        <td className="py-2 pr-4 text-right font-mono text-xs">
+                          {typeof r.metrics?.win_rate === "number" ? `${(r.metrics.win_rate * 100).toFixed(1)}%` : "—"}
+                        </td>
+                        <td className="py-2 pr-4 text-right font-mono text-xs">
+                          {typeof r.metrics?.total_trades === "number" ? r.metrics.total_trades : "—"}
+                        </td>
                         <td className="py-2 text-xs text-[var(--color-text-muted)]">
                           {new Date(r.created_at).toLocaleDateString()}
                         </td>

@@ -98,7 +98,10 @@ class RegimeService:
         return results
 
     def get_position_size(
-        self, symbol: str, entry_price: float, stop_loss_price: float,
+        self,
+        symbol: str,
+        entry_price: float,
+        stop_loss_price: float,
         risk_manager: RiskManager,
     ) -> dict | None:
         df = self._load_data(symbol)
@@ -113,19 +116,24 @@ class RegimeService:
         decision = self.router.route(state)
         regime_modifier = decision.position_size_modifier
         size = risk_manager.calculate_position_size(
-            entry_price=entry_price, stop_loss_price=stop_loss_price,
+            entry_price=entry_price,
+            stop_loss_price=stop_loss_price,
             regime_modifier=regime_modifier,
         )
         return {
-            "symbol": symbol, "regime": state.regime.value,
-            "regime_modifier": regime_modifier, "position_size": round(size, 8),
-            "entry_price": entry_price, "stop_loss_price": stop_loss_price,
+            "symbol": symbol,
+            "regime": state.regime.value,
+            "regime_modifier": regime_modifier,
+            "position_size": round(size, 8),
+            "entry_price": entry_price,
+            "stop_loss_price": stop_loss_price,
             "primary_strategy": decision.primary_strategy,
         }
 
     def _load_data(self, symbol: str) -> pd.DataFrame | None:
         try:
             from common.data_pipeline.pipeline import load_ohlcv
+
             df = load_ohlcv(symbol, "1h", "binance")
             if df is not None and not df.empty:
                 return df
@@ -136,7 +144,8 @@ class RegimeService:
     @staticmethod
     def _state_to_dict(symbol: str, state: RegimeState, ts: datetime) -> dict:
         return {
-            "symbol": symbol, "regime": state.regime.value,
+            "symbol": symbol,
+            "regime": state.regime.value,
             "confidence": round(state.confidence, 3),
             "adx_value": round(state.adx_value, 2),
             "bb_width_percentile": round(state.bb_width_percentile, 2),
@@ -150,12 +159,16 @@ class RegimeService:
     @staticmethod
     def _decision_to_dict(symbol: str, decision: RoutingDecision) -> dict:
         return {
-            "symbol": symbol, "regime": decision.regime.value,
+            "symbol": symbol,
+            "regime": decision.regime.value,
             "confidence": round(decision.confidence, 3),
             "primary_strategy": decision.primary_strategy,
             "weights": [
-                {"strategy_name": w.strategy_name, "weight": w.weight,
-                 "position_size_factor": w.position_size_factor}
+                {
+                    "strategy_name": w.strategy_name,
+                    "weight": w.weight,
+                    "position_size_factor": w.position_size_factor,
+                }
                 for w in decision.weights
             ],
             "position_size_modifier": decision.position_size_modifier,

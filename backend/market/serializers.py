@@ -167,9 +167,13 @@ class RegimeHistoryEntrySerializer(serializers.Serializer):
 
 
 class RegimePositionSizeRequestSerializer(serializers.Serializer):
-    symbol = serializers.CharField()
-    entry_price = serializers.FloatField()
-    stop_loss_price = serializers.FloatField()
+    symbol = serializers.RegexField(
+        regex=r"^[A-Z0-9]{2,10}/[A-Z0-9]{2,10}$",
+        max_length=20,
+        help_text="Trading pair, e.g. BTC/USDT",
+    )
+    entry_price = serializers.FloatField(min_value=1e-8)
+    stop_loss_price = serializers.FloatField(min_value=1e-8)
 
 
 class RegimePositionSizeResponseSerializer(serializers.Serializer):

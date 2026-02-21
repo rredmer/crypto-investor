@@ -202,11 +202,16 @@ class TestNautilusBase:
         entry_price = 100.0
         exit_price = 110.0
         size = 2.0
-        s.bars.append({
-            "timestamp": pd.Timestamp("2024-01-01", tz="UTC"),
-            "open": 110.0, "high": 111.0, "low": 109.0,
-            "close": exit_price, "volume": 1000.0,
-        })
+        s.bars.append(
+            {
+                "timestamp": pd.Timestamp("2024-01-01", tz="UTC"),
+                "open": 110.0,
+                "high": 111.0,
+                "low": 109.0,
+                "close": exit_price,
+                "volume": 1000.0,
+            }
+        )
         s.position = {
             "side": "long",
             "entry_price": entry_price,
@@ -255,16 +260,18 @@ class TestTrendFollowing:
         s = NautilusTrendFollowing()
         # Craft indicators: uptrend (ema_50 > ema_200, close > ema_50),
         # RSI pulled back, volume ok, MACD hist negative but rising, not near BB
-        ind = pd.Series({
-            "close": 105.0,
-            "ema_50": 102.0,
-            "ema_200": 100.0,
-            "rsi_14": 35.0,          # below buy_rsi_threshold (40)
-            "volume_ratio": 1.0,
-            "macd_hist": -0.1,        # negative
-            "macd_hist_prev": -0.5,   # but rising (prev was more negative)
-            "bb_upper": 120.0,
-        })
+        ind = pd.Series(
+            {
+                "close": 105.0,
+                "ema_50": 102.0,
+                "ema_200": 100.0,
+                "rsi_14": 35.0,  # below buy_rsi_threshold (40)
+                "volume_ratio": 1.0,
+                "macd_hist": -0.1,  # negative
+                "macd_hist_prev": -0.5,  # but rising (prev was more negative)
+                "bb_upper": 120.0,
+            }
+        )
         assert s.should_enter(ind) is True
 
     def test_macd_negative_and_falling_rejects_entry(self):
@@ -272,16 +279,18 @@ class TestTrendFollowing:
         from nautilus.strategies.trend_following import NautilusTrendFollowing
 
         s = NautilusTrendFollowing()
-        ind = pd.Series({
-            "close": 105.0,
-            "ema_50": 102.0,
-            "ema_200": 100.0,
-            "rsi_14": 35.0,
-            "volume_ratio": 1.0,
-            "macd_hist": -0.5,        # negative
-            "macd_hist_prev": -0.1,   # and falling (prev was less negative)
-            "bb_upper": 120.0,
-        })
+        ind = pd.Series(
+            {
+                "close": 105.0,
+                "ema_50": 102.0,
+                "ema_200": 100.0,
+                "rsi_14": 35.0,
+                "volume_ratio": 1.0,
+                "macd_hist": -0.5,  # negative
+                "macd_hist_prev": -0.1,  # and falling (prev was less negative)
+                "bb_upper": 120.0,
+            }
+        )
         assert s.should_enter(ind) is False
 
 
@@ -306,13 +315,15 @@ class TestMeanReversion:
         from nautilus.strategies.mean_reversion import NautilusMeanReversion
 
         s = NautilusMeanReversion()
-        ind = pd.Series({
-            "close": 95.0,
-            "bb_lower": 96.0,       # close below BB lower
-            "rsi_14": 25.0,          # oversold (< 35)
-            "volume_ratio": 2.0,     # above volume_factor (1.5)
-            "adx_14": 20.0,          # ranging market (< 30)
-        })
+        ind = pd.Series(
+            {
+                "close": 95.0,
+                "bb_lower": 96.0,  # close below BB lower
+                "rsi_14": 25.0,  # oversold (< 35)
+                "volume_ratio": 2.0,  # above volume_factor (1.5)
+                "adx_14": 20.0,  # ranging market (< 30)
+            }
+        )
         assert s.should_enter(ind) is True
 
     def test_rsi_above_threshold_rejects_entry(self):
@@ -320,13 +331,15 @@ class TestMeanReversion:
         from nautilus.strategies.mean_reversion import NautilusMeanReversion
 
         s = NautilusMeanReversion()
-        ind = pd.Series({
-            "close": 95.0,
-            "bb_lower": 96.0,
-            "rsi_14": 40.0,          # above buy_rsi_threshold (35)
-            "volume_ratio": 2.0,
-            "adx_14": 20.0,
-        })
+        ind = pd.Series(
+            {
+                "close": 95.0,
+                "bb_lower": 96.0,
+                "rsi_14": 40.0,  # above buy_rsi_threshold (35)
+                "volume_ratio": 2.0,
+                "adx_14": 20.0,
+            }
+        )
         assert s.should_enter(ind) is False
 
     def test_high_adx_rejects_entry(self):
@@ -334,13 +347,15 @@ class TestMeanReversion:
         from nautilus.strategies.mean_reversion import NautilusMeanReversion
 
         s = NautilusMeanReversion()
-        ind = pd.Series({
-            "close": 95.0,
-            "bb_lower": 96.0,
-            "rsi_14": 25.0,
-            "volume_ratio": 2.0,
-            "adx_14": 35.0,          # above adx_ceiling (30) -> trending
-        })
+        ind = pd.Series(
+            {
+                "close": 95.0,
+                "bb_lower": 96.0,
+                "rsi_14": 25.0,
+                "volume_ratio": 2.0,
+                "adx_14": 35.0,  # above adx_ceiling (30) -> trending
+            }
+        )
         assert s.should_enter(ind) is False
 
     def test_exit_above_bb_mid(self):
@@ -348,11 +363,13 @@ class TestMeanReversion:
         from nautilus.strategies.mean_reversion import NautilusMeanReversion
 
         s = NautilusMeanReversion()
-        ind = pd.Series({
-            "close": 102.0,
-            "bb_mid": 100.0,         # close above bb_mid -> exit
-            "rsi_14": 50.0,
-        })
+        ind = pd.Series(
+            {
+                "close": 102.0,
+                "bb_mid": 100.0,  # close above bb_mid -> exit
+                "rsi_14": 50.0,
+            }
+        )
         assert s.should_exit(ind) is True
 
     def test_exit_rsi_strong(self):
@@ -360,11 +377,13 @@ class TestMeanReversion:
         from nautilus.strategies.mean_reversion import NautilusMeanReversion
 
         s = NautilusMeanReversion()
-        ind = pd.Series({
-            "close": 98.0,
-            "bb_mid": 100.0,         # still below mid
-            "rsi_14": 70.0,          # above sell_rsi_threshold (65)
-        })
+        ind = pd.Series(
+            {
+                "close": 98.0,
+                "bb_mid": 100.0,  # still below mid
+                "rsi_14": 70.0,  # above sell_rsi_threshold (65)
+            }
+        )
         assert s.should_exit(ind) is True
 
 
@@ -389,14 +408,16 @@ class TestVolatilityBreakout:
         from nautilus.strategies.volatility_breakout import NautilusVolatilityBreakout
 
         s = NautilusVolatilityBreakout()
-        ind = pd.Series({
-            "close": 110.0,
-            "high_20_prev": 108.0,  # close breaks above previous high
-            "volume_ratio": 2.0,    # above volume_factor (1.8)
-            "bb_width": 0.05,       # positive BB width
-            "adx_14": 20.0,         # in emerging-trend range (15-25)
-            "rsi_14": 55.0,         # neutral zone (40-70)
-        })
+        ind = pd.Series(
+            {
+                "close": 110.0,
+                "high_20_prev": 108.0,  # close breaks above previous high
+                "volume_ratio": 2.0,  # above volume_factor (1.8)
+                "bb_width": 0.05,  # positive BB width
+                "adx_14": 20.0,  # in emerging-trend range (15-25)
+                "rsi_14": 55.0,  # neutral zone (40-70)
+            }
+        )
         assert s.should_enter(ind) is True
 
     def test_no_breakout_rejects_entry(self):
@@ -404,14 +425,16 @@ class TestVolatilityBreakout:
         from nautilus.strategies.volatility_breakout import NautilusVolatilityBreakout
 
         s = NautilusVolatilityBreakout()
-        ind = pd.Series({
-            "close": 107.0,
-            "high_20_prev": 108.0,  # close below previous high
-            "volume_ratio": 2.0,
-            "bb_width": 0.05,
-            "adx_14": 20.0,
-            "rsi_14": 55.0,
-        })
+        ind = pd.Series(
+            {
+                "close": 107.0,
+                "high_20_prev": 108.0,  # close below previous high
+                "volume_ratio": 2.0,
+                "bb_width": 0.05,
+                "adx_14": 20.0,
+                "rsi_14": 55.0,
+            }
+        )
         assert s.should_enter(ind) is False
 
     def test_exit_below_ema_20(self):
@@ -419,11 +442,13 @@ class TestVolatilityBreakout:
         from nautilus.strategies.volatility_breakout import NautilusVolatilityBreakout
 
         s = NautilusVolatilityBreakout()
-        ind = pd.Series({
-            "rsi_14": 60.0,     # not exhausted
-            "close": 98.0,
-            "ema_20": 100.0,    # close below ema_20 -> exit
-        })
+        ind = pd.Series(
+            {
+                "rsi_14": 60.0,  # not exhausted
+                "close": 98.0,
+                "ema_20": 100.0,  # close below ema_20 -> exit
+            }
+        )
         assert s.should_exit(ind) is True
 
 
@@ -466,7 +491,11 @@ class TestRunnerDualMode:
         df = _make_ohlcv(300)
         save_ohlcv(df, "DUALTEST/USDT", "1h", "testexch")
         result = run_nautilus_backtest(
-            "NautilusTrendFollowing", "DUALTEST/USDT", "1h", "testexch", 10000.0,
+            "NautilusTrendFollowing",
+            "DUALTEST/USDT",
+            "1h",
+            "testexch",
+            10000.0,
         )
         assert "engine" in result
         assert result["engine"] in ("native", "pandas")
@@ -477,7 +506,12 @@ class TestRunnerDualMode:
 
         df = _make_ohlcv(300)
         result = _run_pandas_backtest(
-            "NautilusTrendFollowing", df, "BTC/USDT", "1h", "binance", 10000.0,
+            "NautilusTrendFollowing",
+            df,
+            "BTC/USDT",
+            "1h",
+            "binance",
+            10000.0,
         )
         assert result["engine"] == "pandas"
         assert "metrics" in result
@@ -499,9 +533,7 @@ try:
 except ImportError:
     _HAS_NT = False
 
-_skip_no_nt = pytest.mark.skipif(
-    not _HAS_NT, reason="nautilus_trader not installed"
-)
+_skip_no_nt = pytest.mark.skipif(not _HAS_NT, reason="nautilus_trader not installed")
 
 
 @_skip_no_nt
@@ -565,7 +597,11 @@ class TestNativeEngine:
         df = _make_ohlcv(300)
         save_ohlcv(df, "NATIVE/USDT", "1h", "testexch")
         result = run_nautilus_backtest(
-            "NautilusTrendFollowing", "NATIVE/USDT", "1h", "testexch", 10000.0,
+            "NautilusTrendFollowing",
+            "NATIVE/USDT",
+            "1h",
+            "testexch",
+            10000.0,
         )
         assert result["engine"] == "native"
 

@@ -108,8 +108,12 @@ class RiskManagementService:
 
     @staticmethod
     def check_trade(
-        portfolio_id: int, symbol: str, side: str, size: float,
-        entry_price: float, stop_loss_price: float | None = None,
+        portfolio_id: int,
+        symbol: str,
+        side: str,
+        size: float,
+        entry_price: float,
+        stop_loss_price: float | None = None,
     ) -> tuple[bool, str]:
         state = RiskManagementService._get_or_create_state(portfolio_id)
         limits_config = RiskManagementService._get_or_create_limits(portfolio_id)
@@ -119,16 +123,24 @@ class RiskManagementService:
         peak = state.peak_equity if state.peak_equity > 0 else 1
         drawdown = 1.0 - (state.total_equity / peak)
         TradeCheckLog.objects.create(
-            portfolio_id=portfolio_id, symbol=symbol, side=side,
-            size=size, entry_price=entry_price, stop_loss_price=stop_loss_price,
-            approved=approved, reason=reason, equity_at_check=state.total_equity,
+            portfolio_id=portfolio_id,
+            symbol=symbol,
+            side=side,
+            size=size,
+            entry_price=entry_price,
+            stop_loss_price=stop_loss_price,
+            approved=approved,
+            reason=reason,
+            equity_at_check=state.total_equity,
             drawdown_at_check=round(drawdown, 4),
             open_positions_at_check=len(state.open_positions or {}),
         )
 
         if not approved:
             RiskManagementService.send_notification(
-                portfolio_id, "trade_rejected", "warning",
+                portfolio_id,
+                "trade_rejected",
+                "warning",
                 f"Trade REJECTED: {symbol} {side} x{size} @ {entry_price} — {reason}",
             )
 
@@ -136,7 +148,9 @@ class RiskManagementService:
 
     @staticmethod
     def calculate_position_size(
-        portfolio_id: int, entry_price: float, stop_loss_price: float,
+        portfolio_id: int,
+        entry_price: float,
+        stop_loss_price: float,
         risk_per_trade: float | None = None,
     ) -> dict:
         state = RiskManagementService._get_or_create_state(portfolio_id)
@@ -159,7 +173,10 @@ class RiskManagementService:
         rm.reset_daily()
         RiskManagementService._persist_state(rm, state)
         RiskManagementService.send_notification(
-            portfolio_id, "daily_reset", "info", "Daily risk counters reset",
+            portfolio_id,
+            "daily_reset",
+            "info",
+            "Daily risk counters reset",
         )
         return RiskManagementService.get_status(portfolio_id)
 
@@ -170,9 +187,12 @@ class RiskManagementService:
         rm = RiskManagementService._build_risk_manager(limits_config, state)
         result = rm.get_var(method)
         return {
-            "var_95": result.var_95, "var_99": result.var_99,
-            "cvar_95": result.cvar_95, "cvar_99": result.cvar_99,
-            "method": result.method, "window_days": result.window_days,
+            "var_95": result.var_95,
+            "var_99": result.var_99,
+            "cvar_95": result.cvar_95,
+            "cvar_99": result.cvar_99,
+            "method": result.method,
+            "window_days": result.window_days,
         }
 
     @staticmethod
@@ -193,9 +213,12 @@ class RiskManagementService:
 
         return RiskMetricHistory.objects.create(
             portfolio_id=portfolio_id,
-            var_95=var_result.var_95, var_99=var_result.var_99,
-            cvar_95=var_result.cvar_95, cvar_99=var_result.cvar_99,
-            method=var_result.method, drawdown=round(drawdown, 4),
+            var_95=var_result.var_95,
+            var_99=var_result.var_99,
+            cvar_95=var_result.cvar_95,
+            cvar_99=var_result.cvar_99,
+            method=var_result.method,
+            drawdown=round(drawdown, 4),
             equity=state.total_equity,
             open_positions_count=len(state.open_positions or {}),
         )
@@ -205,7 +228,8 @@ class RiskManagementService:
         cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
         return list(
             RiskMetricHistory.objects.filter(
-                portfolio_id=portfolio_id, recorded_at__gte=cutoff,
+                portfolio_id=portfolio_id,
+                recorded_at__gte=cutoff,
             ).order_by("-recorded_at")
         )
 
@@ -215,6 +239,17 @@ class RiskManagementService:
         state.is_halted = True
         state.halt_reason = reason
         state.save()
+
+        AlertLog.objects.create(
+            portfolio_id=portfolio_id,
+            event_type="kill_switch_halt",
+            severity="warning",
+            message=f"Kill switch HALT: {reason}",
+            channel="log",
+            delivered=True,
+            error="",
+        )
+
         return {"is_halted": True, "halt_reason": reason, "message": f"Trading halted: {reason}"}
 
     @staticmethod
@@ -247,9 +282,11 @@ class RiskManagementService:
                 },
             )
 
-        # Send notification
+        # Send notification with audit trail
         await sync_to_async(RiskManagementService.send_notification)(
-            portfolio_id, "halt", "critical",
+            portfolio_id,
+            "kill_switch_halt",
+            "critical",
             f"Trading HALTED: {reason} ({cancelled} orders cancelled)",
         )
 
@@ -266,6 +303,17 @@ class RiskManagementService:
         state.is_halted = False
         state.halt_reason = ""
         state.save()
+
+        AlertLog.objects.create(
+            portfolio_id=portfolio_id,
+            event_type="kill_switch_resume",
+            severity="info",
+            message="Kill switch RESUME: Trading resumed",
+            channel="log",
+            delivered=True,
+            error="",
+        )
+
         return {"is_halted": False, "halt_reason": "", "message": "Trading resumed"}
 
     @staticmethod
@@ -289,28 +337,40 @@ class RiskManagementService:
             )
 
         await sync_to_async(RiskManagementService.send_notification)(
-            portfolio_id, "resume", "info", "Trading RESUMED",
+            portfolio_id,
+            "kill_switch_resume",
+            "info",
+            "Trading RESUMED",
         )
 
         return {"is_halted": False, "halt_reason": "", "message": "Trading resumed"}
 
     @staticmethod
     def send_notification(
-        portfolio_id: int, event_type: str, severity: str, message: str,
+        portfolio_id: int,
+        event_type: str,
+        severity: str,
+        message: str,
     ) -> None:
         AlertLog.objects.create(
-            portfolio_id=portfolio_id, event_type=event_type,
-            severity=severity, message=message, channel="log",
-            delivered=True, error="",
+            portfolio_id=portfolio_id,
+            event_type=event_type,
+            severity=severity,
+            message=message,
+            channel="log",
+            delivered=True,
+            error="",
         )
         # Telegram (sync)
-        delivered, error = NotificationService.send_telegram_sync(
-            f"[{severity.upper()}] {message}"
-        )
+        delivered, error = NotificationService.send_telegram_sync(f"[{severity.upper()}] {message}")
         AlertLog.objects.create(
-            portfolio_id=portfolio_id, event_type=event_type,
-            severity=severity, message=message, channel="telegram",
-            delivered=delivered, error=error,
+            portfolio_id=portfolio_id,
+            event_type=event_type,
+            severity=severity,
+            message=message,
+            channel="telegram",
+            delivered=delivered,
+            error=error,
         )
 
     @staticmethod

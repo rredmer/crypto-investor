@@ -31,8 +31,7 @@ class JSONFormatter(logging.Formatter):
             entry["request_id"] = rid
 
         # Attach extra fields passed via logger.info("msg", extra={...})
-        for key in ("request_id", "method", "path", "status", "duration_ms",
-                     "user", "ip", "view"):
+        for key in ("request_id", "method", "path", "status", "duration_ms", "user", "ip", "view"):
             val = getattr(record, key, None)
             if val is not None and key not in entry:
                 entry[key] = val

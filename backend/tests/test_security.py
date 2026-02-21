@@ -24,13 +24,15 @@ class TestSecurity:
         assert settings.SESSION_COOKIE_AGE == 3600
 
     def test_drf_default_auth(self, settings):
-        assert "rest_framework.authentication.SessionAuthentication" in (
-            settings.REST_FRAMEWORK["DEFAULT_AUTHENTICATION_CLASSES"]
+        assert (
+            "rest_framework.authentication.SessionAuthentication"
+            in (settings.REST_FRAMEWORK["DEFAULT_AUTHENTICATION_CLASSES"])
         )
 
     def test_drf_default_permissions(self, settings):
-        assert "rest_framework.permissions.IsAuthenticated" in (
-            settings.REST_FRAMEWORK["DEFAULT_PERMISSION_CLASSES"]
+        assert (
+            "rest_framework.permissions.IsAuthenticated"
+            in (settings.REST_FRAMEWORK["DEFAULT_PERMISSION_CLASSES"])
         )
 
     def test_cors_credentials(self, settings):
@@ -38,9 +40,7 @@ class TestSecurity:
 
     def test_csrf_protection_on_post(self, api_client, django_user_model):
         """POST without CSRF should be rejected for session-authenticated requests."""
-        django_user_model.objects.create_user(
-            username="testuser", password="testpass123!"
-        )
+        django_user_model.objects.create_user(username="testuser", password="testpass123!")
         # Login first (via DRF client which handles CSRF)
         api_client.login(username="testuser", password="testpass123!")
 
@@ -76,9 +76,7 @@ class TestSecurityHardening:
 
     def test_argon2_is_primary_hasher(self, settings):
         """Argon2id should be the first (preferred) password hasher."""
-        assert settings.PASSWORD_HASHERS[0] == (
-            "django.contrib.auth.hashers.Argon2PasswordHasher"
-        )
+        assert settings.PASSWORD_HASHERS[0] == ("django.contrib.auth.hashers.Argon2PasswordHasher")
 
     def test_pbkdf2_is_fallback_hasher(self, settings):
         """PBKDF2 should remain as a fallback for existing password migration."""

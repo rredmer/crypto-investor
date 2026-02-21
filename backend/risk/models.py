@@ -53,6 +53,12 @@ class RiskMetricHistory(models.Model):
             ),
         ]
 
+    def __str__(self):
+        return (
+            f"RiskMetric(portfolio={self.portfolio_id},"
+            f" VaR95={self.var_95:.4f}, {self.recorded_at})"
+        )
+
 
 class TradeCheckLog(models.Model):
     portfolio_id = models.IntegerField(db_index=True)
@@ -71,6 +77,10 @@ class TradeCheckLog(models.Model):
     class Meta:
         ordering = ["-checked_at"]
 
+    def __str__(self):
+        verdict = "APPROVED" if self.approved else "REJECTED"
+        return f"TradeCheck({self.symbol} {self.side} x{self.size} {verdict})"
+
 
 class AlertLog(models.Model):
     portfolio_id = models.IntegerField(db_index=True)
@@ -84,3 +94,6 @@ class AlertLog(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Alert({self.severity} {self.event_type}: {self.message[:50]})"

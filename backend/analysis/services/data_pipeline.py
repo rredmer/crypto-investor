@@ -25,13 +25,17 @@ class DataPipelineService:
                 timeframe = parts[3]
                 try:
                     df = pd.read_parquet(f)
-                    records.append({
-                        "exchange": exchange, "symbol": symbol,
-                        "timeframe": timeframe, "rows": len(df),
-                        "start": str(df.index.min()) if len(df) > 0 else None,
-                        "end": str(df.index.max()) if len(df) > 0 else None,
-                        "file": f.name,
-                    })
+                    records.append(
+                        {
+                            "exchange": exchange,
+                            "symbol": symbol,
+                            "timeframe": timeframe,
+                            "rows": len(df),
+                            "start": str(df.index.min()) if len(df) > 0 else None,
+                            "end": str(df.index.max()) if len(df) > 0 else None,
+                            "file": f.name,
+                        }
+                    )
                 except Exception as e:
                     logger.warning(f"Failed to read {f}: {e}")
         return records
@@ -46,8 +50,10 @@ class DataPipelineService:
         try:
             df = pd.read_parquet(path)
             return {
-                "exchange": exchange, "symbol": symbol,
-                "timeframe": timeframe, "rows": len(df),
+                "exchange": exchange,
+                "symbol": symbol,
+                "timeframe": timeframe,
+                "rows": len(df),
                 "start": str(df.index.min()) if len(df) > 0 else None,
                 "end": str(df.index.max()) if len(df) > 0 else None,
                 "columns": list(df.columns),
@@ -79,7 +85,8 @@ class DataPipelineService:
                     if not df.empty:
                         path = save_ohlcv(df, symbol, tf, exchange_id)
                         results[f"{symbol}_{tf}"] = {
-                            "rows": len(df), "path": str(path),
+                            "rows": len(df),
+                            "path": str(path),
                             "status": "ok",
                         }
                     else:
@@ -110,26 +117,34 @@ class DataPipelineService:
                 done += 1
                 progress_cb(done / total, f"Generating {symbol} {tf} ({done}/{total})")
                 tf_minutes = {
-                    "1m": 1, "5m": 5, "15m": 15,
-                    "1h": 60, "4h": 240, "1d": 1440,
+                    "1m": 1,
+                    "5m": 5,
+                    "15m": 15,
+                    "1h": 60,
+                    "4h": 240,
+                    "1d": 1440,
                 }.get(tf, 60)
                 n_candles = (days * 24 * 60) // tf_minutes
                 timestamps = pd.date_range(
                     end=pd.Timestamp.now(tz="UTC"),
-                    periods=n_candles, freq=f"{tf_minutes}min",
+                    periods=n_candles,
+                    freq=f"{tf_minutes}min",
                 )
 
                 np.random.seed(hash(f"{symbol}_{tf}") % (2**31))
                 returns = np.random.normal(0.0001, 0.02, n_candles)
                 prices = base_price * np.exp(np.cumsum(returns))
 
-                df = pd.DataFrame({
-                    "open": prices * (1 + np.random.uniform(-0.005, 0.005, n_candles)),
-                    "high": prices * (1 + np.abs(np.random.normal(0, 0.01, n_candles))),
-                    "low": prices * (1 - np.abs(np.random.normal(0, 0.01, n_candles))),
-                    "close": prices,
-                    "volume": np.random.uniform(100, 10000, n_candles) * (base_price / 100),
-                }, index=timestamps)
+                df = pd.DataFrame(
+                    {
+                        "open": prices * (1 + np.random.uniform(-0.005, 0.005, n_candles)),
+                        "high": prices * (1 + np.abs(np.random.normal(0, 0.01, n_candles))),
+                        "low": prices * (1 - np.abs(np.random.normal(0, 0.01, n_candles))),
+                        "close": prices,
+                        "volume": np.random.uniform(100, 10000, n_candles) * (base_price / 100),
+                    },
+                    index=timestamps,
+                )
                 df.index.name = "timestamp"
 
                 path = save_ohlcv(df, symbol, tf, "sample")

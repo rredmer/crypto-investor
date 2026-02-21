@@ -38,11 +38,16 @@ class BacktestService:
         progress_cb(0.1, f"Starting Freqtrade backtest: {strategy}")
 
         cmd = [
-            "freqtrade", "backtesting",
-            "--config", str(config_path),
-            "--strategy", strategy,
-            "--timeframe", timeframe,
-            "--userdir", str(ft_dir / "user_data"),
+            "freqtrade",
+            "backtesting",
+            "--config",
+            str(config_path),
+            "--strategy",
+            strategy,
+            "--timeframe",
+            timeframe,
+            "--userdir",
+            str(ft_dir / "user_data"),
         ]
         if timerange:
             cmd.extend(["--timerange", timerange])
@@ -61,7 +66,8 @@ class BacktestService:
 
             if result.returncode != 0:
                 return {
-                    "framework": "freqtrade", "strategy": strategy,
+                    "framework": "freqtrade",
+                    "strategy": strategy,
                     "metrics": metrics,
                     "error": result.stderr[-1000:] if result.stderr else "Unknown error",
                 }
@@ -79,26 +85,30 @@ class BacktestService:
                             bt_data = json.load(f)
                         if "strategy" in bt_data:
                             for _name, strat_data in bt_data["strategy"].items():
-                                metrics.update({
-                                    "total_trades": strat_data.get("total_trades", 0),
-                                    "profit_total": strat_data.get("profit_total", 0),
-                                    "profit_total_abs": strat_data.get("profit_total_abs", 0),
-                                    "max_drawdown": strat_data.get("max_drawdown", 0),
-                                    "sharpe_ratio": strat_data.get("sharpe", 0),
-                                    "win_rate": (
-                                        strat_data.get("wins", 0)
-                                        / max(strat_data.get("total_trades", 1), 1)
-                                    ),
-                                })
+                                metrics.update(
+                                    {
+                                        "total_trades": strat_data.get("total_trades", 0),
+                                        "profit_total": strat_data.get("profit_total", 0),
+                                        "profit_total_abs": strat_data.get("profit_total_abs", 0),
+                                        "max_drawdown": strat_data.get("max_drawdown", 0),
+                                        "sharpe_ratio": strat_data.get("sharpe", 0),
+                                        "win_rate": (
+                                            strat_data.get("wins", 0)
+                                            / max(strat_data.get("total_trades", 1), 1)
+                                        ),
+                                    }
+                                )
                                 break
                     except Exception as e:
                         logger.warning(f"Failed to parse Freqtrade results: {e}")
 
             progress_cb(1.0, "Complete")
             return {
-                "framework": "freqtrade", "strategy": strategy,
+                "framework": "freqtrade",
+                "strategy": strategy,
                 "symbol": params.get("symbol", ""),
-                "timeframe": timeframe, "timerange": timerange,
+                "timeframe": timeframe,
+                "timerange": timerange,
                 "metrics": metrics,
             }
         except subprocess.TimeoutExpired:
@@ -166,7 +176,12 @@ class BacktestService:
 
         progress_cb(0.3, f"Running HFT backtest: {strategy}...")
         result = run_hft_backtest(
-            strategy, symbol, timeframe, exchange, latency_ns, initial_balance,
+            strategy,
+            symbol,
+            timeframe,
+            exchange,
+            latency_ns,
+            initial_balance,
         )
 
         if "error" in result:
@@ -185,28 +200,42 @@ class BacktestService:
             for f in ft_dir.glob("*.py"):
                 if f.stem.startswith("_"):
                     continue
-                strategies.append({
-                    "name": f.stem, "framework": "freqtrade", "file_path": str(f),
-                })
+                strategies.append(
+                    {
+                        "name": f.stem,
+                        "framework": "freqtrade",
+                        "file_path": str(f),
+                    }
+                )
 
         # Nautilus strategies (registry-based)
         ensure_platform_imports()
         try:
             from nautilus.strategies import STRATEGY_REGISTRY as NT_REGISTRY
+
             for name in NT_REGISTRY:
-                strategies.append({
-                    "name": name, "framework": "nautilus", "file_path": "",
-                })
+                strategies.append(
+                    {
+                        "name": name,
+                        "framework": "nautilus",
+                        "file_path": "",
+                    }
+                )
         except ImportError:
             pass
 
         # HFT strategies (registry-based)
         try:
             from hftbacktest.strategies import STRATEGY_REGISTRY as HFT_REGISTRY
+
             for name in HFT_REGISTRY:
-                strategies.append({
-                    "name": name, "framework": "hftbacktest", "file_path": "",
-                })
+                strategies.append(
+                    {
+                        "name": name,
+                        "framework": "hftbacktest",
+                        "file_path": "",
+                    }
+                )
         except ImportError:
             pass
 

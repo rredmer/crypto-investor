@@ -68,18 +68,14 @@ class TestADX:
         trend_close = np.linspace(100, 200, n)
         trend_high = trend_close + 1
         trend_low = trend_close - 1
-        trend_df = pd.DataFrame(
-            {"high": trend_high, "low": trend_low, "close": trend_close}
-        )
+        trend_df = pd.DataFrame({"high": trend_high, "low": trend_low, "close": trend_close})
 
         # Ranging: oscillating
         np.random.seed(42)
         range_close = 100 + np.sin(np.linspace(0, 20, n)) * 5
         range_high = range_close + 1
         range_low = range_close - 1
-        range_df = pd.DataFrame(
-            {"high": range_high, "low": range_low, "close": range_close}
-        )
+        range_df = pd.DataFrame({"high": range_high, "low": range_low, "close": range_close})
 
         trend_adx = adx(trend_df, 14).iloc[-1]
         range_adx = adx(range_df, 14).iloc[-1]
@@ -342,9 +338,7 @@ class TestIntegrationWithVBT:
             "rsi_threshold": [40],
             "sell_rsi_threshold": [80],
         }
-        results_df = sweep_parameters(
-            df, crypto_investor_v1_signals, tiny_grid, sl_stop=0.05
-        )
+        results_df = sweep_parameters(df, crypto_investor_v1_signals, tiny_grid, sl_stop=0.05)
         assert len(results_df) == 1
         assert "sharpe_ratio" in results_df.columns
         assert "passes_gate2" in results_df.columns
@@ -388,9 +382,7 @@ class TestIntegrationWithVBT:
             "volume_factor": [1.5],
             "sell_rsi_threshold": [65],
         }
-        report = run_validation(
-            "BMR_test", df, bollinger_mr_signals, tiny_grid, sl_stop=0.04
-        )
+        report = run_validation("BMR_test", df, bollinger_mr_signals, tiny_grid, sl_stop=0.04)
         filepath = save_report(report, output_dir=tmp_path)
         assert filepath.exists()
 
@@ -462,12 +454,18 @@ class TestVolatilityBreakoutParams:
         """Different rsi_high values should produce different entry counts."""
         df = generate_synthetic_ohlcv(n=5000)
         params_narrow = {
-            "breakout_period": 20, "volume_factor": 1.2, "adx_low": 10,
-            "adx_high": 35, "rsi_low": 35, "rsi_high": 60,
-            "adx_tolerance": 0.5, "sell_rsi_threshold": 85,
+            "breakout_period": 20,
+            "volume_factor": 1.2,
+            "adx_low": 10,
+            "adx_high": 35,
+            "rsi_low": 35,
+            "rsi_high": 60,
+            "adx_tolerance": 0.5,
+            "sell_rsi_threshold": 85,
         }
         params_wide = {
-            **params_narrow, "rsi_high": 75,
+            **params_narrow,
+            "rsi_high": 75,
         }
         entries_narrow, _ = volatility_breakout_signals(df, params_narrow)
         entries_wide, _ = volatility_breakout_signals(df, params_wide)
@@ -478,12 +476,18 @@ class TestVolatilityBreakoutParams:
         """Higher ADX tolerance should generate more entries."""
         df = generate_synthetic_ohlcv(n=5000)
         params_strict = {
-            "breakout_period": 20, "volume_factor": 1.2, "adx_low": 10,
-            "adx_high": 35, "rsi_low": 35, "rsi_high": 70,
-            "adx_tolerance": 0.0, "sell_rsi_threshold": 85,
+            "breakout_period": 20,
+            "volume_factor": 1.2,
+            "adx_low": 10,
+            "adx_high": 35,
+            "rsi_low": 35,
+            "rsi_high": 70,
+            "adx_tolerance": 0.0,
+            "sell_rsi_threshold": 85,
         }
         params_tolerant = {
-            **params_strict, "adx_tolerance": 1.0,
+            **params_strict,
+            "adx_tolerance": 1.0,
         }
         entries_strict, _ = volatility_breakout_signals(df, params_strict)
         entries_tolerant, _ = volatility_breakout_signals(df, params_tolerant)
@@ -494,11 +498,17 @@ class TestVolatilityBreakoutParams:
         """Without adx_tolerance param, default 0.5 should be used."""
         df = generate_synthetic_ohlcv(n=2000)
         params_no_key = {
-            "breakout_period": 20, "volume_factor": 1.8, "adx_low": 15,
-            "adx_high": 25, "rsi_low": 40, "sell_rsi_threshold": 85,
+            "breakout_period": 20,
+            "volume_factor": 1.8,
+            "adx_low": 15,
+            "adx_high": 25,
+            "rsi_low": 40,
+            "sell_rsi_threshold": 85,
         }
         params_explicit = {
-            **params_no_key, "adx_tolerance": 0.5, "rsi_high": 70,
+            **params_no_key,
+            "adx_tolerance": 0.5,
+            "rsi_high": 70,
         }
         entries_default, _ = volatility_breakout_signals(df, params_no_key)
         entries_explicit, _ = volatility_breakout_signals(df, params_explicit)
@@ -541,9 +551,7 @@ class TestVolatilityBreakoutIntegration:
             "adx_tolerance": [0.5],
             "sell_rsi_threshold": [85],
         }
-        results_df = sweep_parameters(
-            df, volatility_breakout_signals, tiny_grid, sl_stop=0.03
-        )
+        results_df = sweep_parameters(df, volatility_breakout_signals, tiny_grid, sl_stop=0.03)
         assert len(results_df) == 1
         assert "sharpe_ratio" in results_df.columns
         assert "passes_gate2" in results_df.columns

@@ -110,9 +110,7 @@ class LiveTradingService:
         service = ExchangeService(exchange_id=order.exchange_id)
         try:
             exchange = await service._get_exchange()
-            ccxt_order = await exchange.fetch_order(
-                order.exchange_order_id, order.symbol
-            )
+            ccxt_order = await exchange.fetch_order(order.exchange_order_id, order.symbol)
 
             new_status = CCXT_STATUS_MAP.get(ccxt_order.get("status", ""))
             if not new_status or new_status == order.status:
@@ -153,8 +151,7 @@ class LiveTradingService:
                 await LiveTradingService._broadcast_order_update(order)
             except ValueError:
                 logger.warning(
-                    f"Invalid transition for order {order.id}: "
-                    f"{order.status} -> {new_status}"
+                    f"Invalid transition for order {order.id}: {order.status} -> {new_status}"
                 )
 
         except Exception as e:
@@ -168,8 +165,10 @@ class LiveTradingService:
     async def cancel_order(order: Order) -> Order:
         """Cancel an order on the exchange."""
         terminal = {
-            OrderStatus.FILLED, OrderStatus.CANCELLED,
-            OrderStatus.REJECTED, OrderStatus.ERROR,
+            OrderStatus.FILLED,
+            OrderStatus.CANCELLED,
+            OrderStatus.REJECTED,
+            OrderStatus.ERROR,
         }
         if order.status in terminal:
             return order

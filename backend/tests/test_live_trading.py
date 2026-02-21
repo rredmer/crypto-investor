@@ -28,18 +28,22 @@ def live_order(db):
 @pytest.fixture
 def mock_exchange():
     exchange = AsyncMock()
-    exchange.create_order = AsyncMock(return_value={
-        "id": "EX-12345",
-        "status": "open",
-        "filled": 0,
-    })
-    exchange.fetch_order = AsyncMock(return_value={
-        "id": "EX-12345",
-        "status": "closed",
-        "filled": 0.1,
-        "average": 50100.0,
-        "fee": {"cost": 0.05, "currency": "USDT"},
-    })
+    exchange.create_order = AsyncMock(
+        return_value={
+            "id": "EX-12345",
+            "status": "open",
+            "filled": 0,
+        }
+    )
+    exchange.fetch_order = AsyncMock(
+        return_value={
+            "id": "EX-12345",
+            "status": "closed",
+            "filled": 0.1,
+            "average": 50100.0,
+            "fee": {"cost": 0.05, "currency": "USDT"},
+        }
+    )
     exchange.cancel_order = AsyncMock(return_value={"status": "canceled"})
     exchange.load_markets = AsyncMock()
     return exchange
@@ -190,22 +194,40 @@ class TestLiveTradingCancel:
     async def test_cancel_all_open_orders(self, mock_exchange):
         now = timezone.now()
         await sync_to_async(Order.objects.create)(
-            exchange_id="binance", symbol="BTC/USDT", side="buy",
-            order_type="market", amount=0.1, mode=TradingMode.LIVE,
-            status=OrderStatus.SUBMITTED, exchange_order_id="EX-1",
-            portfolio_id=1, timestamp=now,
+            exchange_id="binance",
+            symbol="BTC/USDT",
+            side="buy",
+            order_type="market",
+            amount=0.1,
+            mode=TradingMode.LIVE,
+            status=OrderStatus.SUBMITTED,
+            exchange_order_id="EX-1",
+            portfolio_id=1,
+            timestamp=now,
         )
         await sync_to_async(Order.objects.create)(
-            exchange_id="binance", symbol="ETH/USDT", side="sell",
-            order_type="limit", amount=1.0, mode=TradingMode.LIVE,
-            status=OrderStatus.OPEN, exchange_order_id="EX-2",
-            portfolio_id=1, timestamp=now,
+            exchange_id="binance",
+            symbol="ETH/USDT",
+            side="sell",
+            order_type="limit",
+            amount=1.0,
+            mode=TradingMode.LIVE,
+            status=OrderStatus.OPEN,
+            exchange_order_id="EX-2",
+            portfolio_id=1,
+            timestamp=now,
         )
         # This paper order should NOT be cancelled
         await sync_to_async(Order.objects.create)(
-            exchange_id="binance", symbol="SOL/USDT", side="buy",
-            order_type="market", amount=5.0, mode=TradingMode.PAPER,
-            status=OrderStatus.SUBMITTED, portfolio_id=1, timestamp=now,
+            exchange_id="binance",
+            symbol="SOL/USDT",
+            side="buy",
+            order_type="market",
+            amount=5.0,
+            mode=TradingMode.PAPER,
+            status=OrderStatus.SUBMITTED,
+            portfolio_id=1,
+            timestamp=now,
         )
 
         mock_service = MagicMock()

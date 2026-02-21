@@ -7,8 +7,13 @@ class OrderFillEventSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrderFillEvent
         fields = [
-            "id", "fill_price", "fill_amount", "fee", "fee_currency",
-            "exchange_trade_id", "filled_at",
+            "id",
+            "fill_price",
+            "fill_amount",
+            "fee",
+            "fee_currency",
+            "exchange_trade_id",
+            "filled_at",
         ]
 
 
@@ -18,18 +23,49 @@ class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = [
-            "id", "exchange_id", "exchange_order_id", "symbol", "side",
-            "order_type", "amount", "price", "filled", "status", "mode",
-            "portfolio_id", "avg_fill_price", "stop_loss_price", "fee",
-            "fee_currency", "reject_reason", "error_message", "timestamp",
-            "submitted_at", "filled_at", "cancelled_at",
-            "created_at", "updated_at", "fill_events",
+            "id",
+            "exchange_id",
+            "exchange_order_id",
+            "symbol",
+            "side",
+            "order_type",
+            "amount",
+            "price",
+            "filled",
+            "status",
+            "mode",
+            "portfolio_id",
+            "avg_fill_price",
+            "stop_loss_price",
+            "fee",
+            "fee_currency",
+            "reject_reason",
+            "error_message",
+            "timestamp",
+            "submitted_at",
+            "filled_at",
+            "cancelled_at",
+            "created_at",
+            "updated_at",
+            "fill_events",
         ]
         read_only_fields = [
-            "id", "exchange_order_id", "filled", "status", "avg_fill_price",
-            "fee", "fee_currency", "reject_reason", "error_message",
-            "submitted_at", "filled_at", "cancelled_at",
-            "timestamp", "created_at", "updated_at", "fill_events",
+            "id",
+            "exchange_order_id",
+            "filled",
+            "status",
+            "avg_fill_price",
+            "fee",
+            "fee_currency",
+            "reject_reason",
+            "error_message",
+            "submitted_at",
+            "filled_at",
+            "cancelled_at",
+            "timestamp",
+            "created_at",
+            "updated_at",
+            "fill_events",
         ]
 
 
@@ -41,7 +77,7 @@ class OrderCreateSerializer(serializers.Serializer):
     )
     side = serializers.ChoiceField(choices=["buy", "sell"])
     order_type = serializers.ChoiceField(choices=["market", "limit"], default="market")
-    amount = serializers.FloatField(min_value=0.0)
+    amount = serializers.FloatField(min_value=1e-8)
     price = serializers.FloatField(default=0.0, min_value=0.0)
     exchange_id = serializers.CharField(max_length=50, default="binance")
     mode = serializers.ChoiceField(choices=["paper", "live"], default="paper")

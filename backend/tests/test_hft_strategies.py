@@ -204,7 +204,7 @@ class TestHFTBase:
         t1 = {"timestamp": 1000, "price": 110.0, "volume": 1.0, "side": "buy"}
         t2 = {"timestamp": 2000, "price": 100.0, "volume": 1.0, "side": "sell"}
         s.submit_order("sell", 110.0, 1.0, t1)  # Short entry
-        s.submit_order("buy", 100.0, 1.0, t2)   # Buy to close
+        s.submit_order("buy", 100.0, 1.0, t2)  # Buy to close
         assert s.position == 0.0
         df = s.get_trades_df()
         assert len(df) == 1
@@ -221,9 +221,9 @@ class TestHFTBase:
         s = HFTBaseStrategy(config={"fee_rate": 0.0, "max_position": 5.0})
         t1 = {"timestamp": 1000, "price": 100.0, "volume": 1.0, "side": "sell"}
         t2 = {"timestamp": 2000, "price": 110.0, "volume": 1.0, "side": "buy"}
-        s.submit_order("buy", 100.0, 3.0, t1)   # Long 3.0
-        s.submit_order("sell", 110.0, 1.0, t2)   # Sell 1.0: partial close
-        assert s.position == pytest.approx(2.0)   # 2.0 still open
+        s.submit_order("buy", 100.0, 3.0, t1)  # Long 3.0
+        s.submit_order("sell", 110.0, 1.0, t2)  # Sell 1.0: partial close
+        assert s.position == pytest.approx(2.0)  # 2.0 still open
         df = s.get_trades_df()
         assert len(df) == 1  # One closed round-trip
         assert df.iloc[0]["size"] == pytest.approx(1.0)
@@ -236,8 +236,8 @@ class TestHFTBase:
         s = HFTBaseStrategy(config={"fee_rate": 0.0, "max_position": 5.0})
         t1 = {"timestamp": 1000, "price": 100.0, "volume": 1.0, "side": "sell"}
         t2 = {"timestamp": 2000, "price": 110.0, "volume": 1.0, "side": "buy"}
-        s.submit_order("buy", 100.0, 1.0, t1)   # Long 1.0
-        s.submit_order("sell", 110.0, 3.0, t2)   # Sell 3.0: close 1.0 long + open 2.0 short
+        s.submit_order("buy", 100.0, 1.0, t1)  # Long 1.0
+        s.submit_order("sell", 110.0, 3.0, t2)  # Sell 3.0: close 1.0 long + open 2.0 short
         assert s.position == pytest.approx(-2.0)
         df = s.get_trades_df()
         # Only 1 closed trade (the long close), short 2.0 is still open

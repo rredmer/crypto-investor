@@ -28,11 +28,7 @@ def _make_synthetic_df(n: int = 500, trend: str = "up") -> pd.DataFrame:
     elif trend == "down":
         close = 200 - np.linspace(0, 50, n) + np.random.randn(n) * 0.5
     else:
-        close = (
-            100
-            + np.sin(np.linspace(0, 20, n)) * 3
-            + np.random.randn(n) * 0.3
-        )
+        close = 100 + np.sin(np.linspace(0, 20, n)) * 3 + np.random.randn(n) * 0.3
     high = close + np.abs(np.random.randn(n) * 0.8)
     low = close - np.abs(np.random.randn(n) * 0.8)
     volume = np.random.uniform(1000, 5000, n)
