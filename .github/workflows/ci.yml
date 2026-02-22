@@ -52,7 +52,7 @@ jobs:
       - name: Install backend dependencies
         run: |
           python -m venv backend/.venv
-          backend/.venv/bin/pip install -e "backend[dev]" --quiet
+          backend/.venv/bin/pip install -e "backend[dev,analysis]" --quiet
       - name: Run pytest
         env:
           DJANGO_DEBUG: "true"
@@ -131,7 +131,7 @@ jobs:
         env:
           DJANGO_DEBUG: "true"
         run: |
-          cd backend && ../.venv/bin/python manage.py spectacular --file /tmp/schema-check.yaml 2>/dev/null
+          backend/.venv/bin/python backend/manage.py spectacular --file /tmp/schema-check.yaml 2>/dev/null
           diff -q frontend/schema.yaml /tmp/schema-check.yaml || {
             echo "::error::Schema is stale — run 'make generate-types' to update"
             exit 1
