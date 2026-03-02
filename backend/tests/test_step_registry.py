@@ -19,8 +19,8 @@ class TestStepRegistry:
         }
         assert expected.issubset(set(STEP_REGISTRY.keys()))
 
-    def test_registry_has_10_entries(self):
-        assert len(STEP_REGISTRY) == 10
+    def test_registry_has_11_entries(self):
+        assert len(STEP_REGISTRY) == 11
 
     def test_all_executors_callable(self):
         for name, executor in STEP_REGISTRY.items():
@@ -28,7 +28,7 @@ class TestStepRegistry:
 
     def test_get_step_types(self):
         types = get_step_types()
-        assert len(types) == 10
+        assert len(types) == 11
         type_names = {t["step_type"] for t in types}
         assert "data_refresh" in type_names
         assert "sentiment_aggregate" in type_names

@@ -172,7 +172,7 @@ class TestWorkflowStepTypesAPI:
         resp = authenticated_client.get("/api/workflow-steps/")
         assert resp.status_code == 200
         data = resp.json()
-        assert len(data) == 10
+        assert len(data) == 11
         type_names = {t["step_type"] for t in data}
         assert "data_refresh" in type_names
         assert "sentiment_aggregate" in type_names

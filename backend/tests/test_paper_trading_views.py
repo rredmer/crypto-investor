@@ -15,7 +15,7 @@ def _mock_paper_service():
     service.get_open_trades = AsyncMock(return_value=[])
     service.get_trade_history = AsyncMock(return_value=[])
     service.get_profit = AsyncMock(return_value={"total_profit": 0.0})
-    service.get_performance = AsyncMock(return_value={"win_rate": 0.0, "trades": 0})
+    service.get_performance = AsyncMock(return_value=[{"win_rate": 0.0, "trades": 0}])
     service.get_balance = AsyncMock(return_value={"USDT": 10000.0})
     service.get_log_entries.return_value = []
     return service
@@ -23,9 +23,10 @@ def _mock_paper_service():
 
 @pytest.fixture(autouse=True)
 def _patch_paper_service():
-    """Patch _get_paper_trading_service globally for all tests in this module."""
+    """Patch _get_paper_trading_services globally for all tests in this module."""
     service = _mock_paper_service()
-    with patch("trading.views._get_paper_trading_service", return_value=service):
+    services = {"CryptoInvestorV1": service}
+    with patch("trading.views._get_paper_trading_services", return_value=services):
         yield service
 
 
@@ -35,7 +36,9 @@ class TestPaperTradingStatusView:
         resp = authenticated_client.get("/api/paper-trading/status/")
         assert resp.status_code == status.HTTP_200_OK
         data = resp.json()
-        assert "running" in data
+        assert isinstance(data, list)
+        assert len(data) == 1
+        assert "running" in data[0]
 
     def test_status_requires_auth(self, api_client):
         resp = api_client.get("/api/paper-trading/status/")
@@ -97,7 +100,10 @@ class TestPaperTradingProfitView:
     def test_profit_returns_json(self, authenticated_client):
         resp = authenticated_client.get("/api/paper-trading/profit/")
         assert resp.status_code == status.HTTP_200_OK
-        assert "total_profit" in resp.json()
+        data = resp.json()
+        assert isinstance(data, list)
+        assert len(data) == 1
+        assert "total_profit" in data[0]
 
 
 @pytest.mark.django_db
@@ -105,7 +111,10 @@ class TestPaperTradingPerformanceView:
     def test_performance_returns_json(self, authenticated_client):
         resp = authenticated_client.get("/api/paper-trading/performance/")
         assert resp.status_code == status.HTTP_200_OK
-        assert "win_rate" in resp.json()
+        data = resp.json()
+        assert isinstance(data, list)
+        assert len(data) == 1
+        assert "win_rate" in data[0]
 
 
 @pytest.mark.django_db
@@ -113,7 +122,10 @@ class TestPaperTradingBalanceView:
     def test_balance_returns_json(self, authenticated_client):
         resp = authenticated_client.get("/api/paper-trading/balance/")
         assert resp.status_code == status.HTTP_200_OK
-        assert "USDT" in resp.json()
+        data = resp.json()
+        assert isinstance(data, list)
+        assert len(data) == 1
+        assert "USDT" in data[0]
 
 
 @pytest.mark.django_db
