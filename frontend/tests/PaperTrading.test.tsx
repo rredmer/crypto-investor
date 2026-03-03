@@ -4,23 +4,29 @@ import { PaperTrading } from "../src/pages/PaperTrading";
 import { ErrorBoundary } from "../src/components/ErrorBoundary";
 import { renderWithProviders, mockFetch } from "./helpers";
 
-const stoppedStatus = {
+const stoppedInstance = {
   running: false,
   strategy: null,
   pid: null,
   started_at: null,
   uptime_seconds: 0,
   exit_code: null,
+  instance: "freqtrade_civ1",
 };
 
-const runningStatus = {
+const runningInstance = {
   running: true,
   strategy: "CryptoInvestorV1",
   pid: 12345,
   started_at: "2026-02-15T10:00:00Z",
   uptime_seconds: 3600,
   exit_code: null,
+  instance: "freqtrade_civ1",
 };
+
+// API returns arrays for multi-instance support
+const stoppedStatuses = [stoppedInstance];
+const runningStatuses = [runningInstance];
 
 const mockStrategies = [
   { name: "CryptoInvestorV1", framework: "freqtrade", file_path: "" },
@@ -33,7 +39,7 @@ describe("PaperTrading - Stopped State", () => {
     vi.stubGlobal(
       "fetch",
       mockFetch({
-        "/api/paper-trading/status": stoppedStatus,
+        "/api/paper-trading/status": stoppedStatuses,
         "/api/paper-trading/log": [],
         "/api/backtest/strategies": mockStrategies,
       }),
@@ -75,9 +81,9 @@ describe("PaperTrading - Running State", () => {
     vi.stubGlobal(
       "fetch",
       mockFetch({
-        "/api/paper-trading/status": runningStatus,
+        "/api/paper-trading/status": runningStatuses,
         "/api/paper-trading/trades": [],
-        "/api/paper-trading/profit": {
+        "/api/paper-trading/profit": [{
           profit_all_coin: 0.05,
           profit_all_percent: 2.5,
           profit_closed_coin: 0.03,
@@ -86,7 +92,7 @@ describe("PaperTrading - Running State", () => {
           closed_trade_count: 3,
           winning_trades: 2,
           losing_trades: 1,
-        },
+        }],
         "/api/paper-trading/performance": [
           { pair: "BTC/USDT", profit: 1.5, count: 3 },
         ],
@@ -135,7 +141,7 @@ describe("PaperTrading - ErrorBoundary", () => {
   beforeEach(() => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.stubGlobal("fetch", mockFetch({
-      "/api/paper-trading/status": stoppedStatus,
+      "/api/paper-trading/status": stoppedStatuses,
       "/api/backtest/strategies": mockStrategies,
     }));
   });
@@ -157,9 +163,9 @@ describe("PaperTrading - Performance Table", () => {
     vi.stubGlobal(
       "fetch",
       mockFetch({
-        "/api/paper-trading/status": runningStatus,
+        "/api/paper-trading/status": runningStatuses,
         "/api/paper-trading/trades": [],
-        "/api/paper-trading/profit": {
+        "/api/paper-trading/profit": [{
           profit_all_coin: 0.05,
           profit_all_percent: 2.5,
           profit_closed_coin: 0.03,
@@ -168,7 +174,7 @@ describe("PaperTrading - Performance Table", () => {
           closed_trade_count: 3,
           winning_trades: 2,
           losing_trades: 1,
-        },
+        }],
         "/api/paper-trading/performance": [
           { pair: "BTC/USDT", profit: 1.5, count: 3 },
           { pair: "ETH/USDT", profit: -0.8, count: 2 },
@@ -209,13 +215,13 @@ describe("PaperTrading - Trade History", () => {
     vi.stubGlobal(
       "fetch",
       mockFetch({
-        "/api/paper-trading/status": runningStatus,
+        "/api/paper-trading/status": runningStatuses,
         "/api/paper-trading/trades": [],
-        "/api/paper-trading/profit": {
+        "/api/paper-trading/profit": [{
           profit_all_coin: 0, profit_all_percent: 0, profit_closed_coin: 0,
           profit_closed_percent: 0, trade_count: 0, closed_trade_count: 0,
           winning_trades: 0, losing_trades: 0,
-        },
+        }],
         "/api/paper-trading/performance": [],
         "/api/paper-trading/history": [
           {
@@ -267,13 +273,13 @@ describe("PaperTrading - No Data Messages", () => {
     vi.stubGlobal(
       "fetch",
       mockFetch({
-        "/api/paper-trading/status": runningStatus,
+        "/api/paper-trading/status": runningStatuses,
         "/api/paper-trading/trades": [],
-        "/api/paper-trading/profit": {
+        "/api/paper-trading/profit": [{
           profit_all_coin: 0, profit_all_percent: 0, profit_closed_coin: 0,
           profit_closed_percent: 0, trade_count: 0, closed_trade_count: 0,
           winning_trades: 0, losing_trades: 0,
-        },
+        }],
         "/api/paper-trading/performance": [],
         "/api/paper-trading/history": [],
         "/api/paper-trading/log": [],
@@ -288,13 +294,13 @@ describe("PaperTrading - No Data Messages", () => {
     vi.stubGlobal(
       "fetch",
       mockFetch({
-        "/api/paper-trading/status": runningStatus,
+        "/api/paper-trading/status": runningStatuses,
         "/api/paper-trading/trades": [],
-        "/api/paper-trading/profit": {
+        "/api/paper-trading/profit": [{
           profit_all_coin: 0, profit_all_percent: 0, profit_closed_coin: 0,
           profit_closed_percent: 0, trade_count: 0, closed_trade_count: 0,
           winning_trades: 0, losing_trades: 0,
-        },
+        }],
         "/api/paper-trading/performance": [],
         "/api/paper-trading/history": [],
         "/api/paper-trading/log": [],
@@ -309,7 +315,7 @@ describe("PaperTrading - No Data Messages", () => {
     vi.stubGlobal(
       "fetch",
       mockFetch({
-        "/api/paper-trading/status": stoppedStatus,
+        "/api/paper-trading/status": stoppedStatuses,
         "/api/paper-trading/log": [],
         "/api/backtest/strategies": mockStrategies,
       }),
