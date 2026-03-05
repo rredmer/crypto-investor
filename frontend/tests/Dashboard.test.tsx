@@ -12,13 +12,11 @@ vi.mock("../src/components/PriceChart", () => ({
 
 const mockPlatformStatus = {
   frameworks: [
-    { name: "VectorBT", installed: true, version: "0.28.4", status: "running", details: { screens_available: 6, total_screens: 42, last_screen_at: new Date(Date.now() - 7200000).toISOString() } },
-    { name: "Freqtrade", installed: true, version: "2026.1", status: "running", details: { instances_running: 3, strategies: ["CryptoInvestorV1", "BollingerMeanReversion", "VolatilityBreakout"], open_trades: 1 } },
-    { name: "NautilusTrader", installed: true, version: "configured", status: "configured", details: { strategies_configured: 7, asset_classes: ["crypto", "equity", "forex"] } },
-    { name: "HFT Backtest", installed: true, version: "configured", status: "configured", details: { strategies_configured: 4 } },
-    { name: "CCXT", installed: true, version: "4.5.40", status: "running", details: { exchange: "kraken", connected: true, latency_ms: 45.2 } },
-    { name: "Pandas", installed: true, version: "2.3.3", status: "idle", details: null },
-    { name: "TA-Lib", installed: true, version: "0.6.4", status: "idle", details: null },
+    { name: "VectorBT", installed: true, version: null, status: "running", status_label: "6 screens \u00b7 last run 2h ago", details: { screens_available: 6, total_screens: 42, last_screen_at: new Date(Date.now() - 7200000).toISOString() } },
+    { name: "Freqtrade", installed: true, version: null, status: "running", status_label: "3 instances \u00b7 1 open trade", details: { instances_running: 3, strategies: ["CryptoInvestorV1", "BollingerMeanReversion", "VolatilityBreakout"], open_trades: 1 } },
+    { name: "NautilusTrader", installed: true, version: null, status: "idle", status_label: "7 strategies configured", details: { strategies_configured: 7, asset_classes: ["crypto", "equity", "forex"] } },
+    { name: "HFT Backtest", installed: true, version: null, status: "idle", status_label: "4 strategies configured", details: { strategies_configured: 4 } },
+    { name: "CCXT", installed: true, version: "4.5.40", status: "running", status_label: "kraken \u00b7 45.2ms", details: { exchange: "kraken", connected: true, latency_ms: 45.2 } },
   ],
   data_files: 12,
   active_jobs: 2,
@@ -400,14 +398,20 @@ describe("Dashboard", () => {
     expect(dot).toBeInTheDocument();
   });
 
-  it("shows framework detail text", async () => {
+  it("shows framework status labels", async () => {
     renderWithProviders(<Dashboard />);
     await screen.findByText("Framework Status");
-    // Freqtrade: "3 instances · 1 open trade"
+    // status_label values rendered in the right column
     expect(screen.getByText(/3 instances/)).toBeInTheDocument();
-    // CCXT: "kraken · 45.2ms"
     expect(screen.getByText(/kraken · 45\.2ms/)).toBeInTheDocument();
-    // VectorBT: "6 screens · last run 2h ago"
     expect(screen.getByText(/6 screens/)).toBeInTheDocument();
+  });
+
+  it("shows framework status legend", async () => {
+    renderWithProviders(<Dashboard />);
+    await screen.findByText("Framework Status");
+    expect(screen.getByText("Active")).toBeInTheDocument();
+    expect(screen.getByText("Ready")).toBeInTheDocument();
+    expect(screen.getByText("Not Installed")).toBeInTheDocument();
   });
 });

@@ -46,6 +46,18 @@ class TaskScheduler:
 
         from apscheduler.schedulers.background import BackgroundScheduler
 
+        # Recover any jobs/workflows left in running/pending state from a previous crash
+        try:
+            from analysis.services.job_runner import (
+                recover_stale_jobs,
+                recover_stale_workflow_runs,
+            )
+
+            recover_stale_jobs()
+            recover_stale_workflow_runs()
+        except Exception:
+            logger.exception("Failed to recover stale jobs on startup")
+
         self._scheduler = BackgroundScheduler(
             job_defaults={"coalesce": True, "max_instances": 1},
             timezone="UTC",

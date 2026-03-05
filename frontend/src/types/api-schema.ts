@@ -2209,11 +2209,19 @@ export interface components {
             name: string;
             installed: boolean;
             version: string | null;
-            status: string;
+            status: components["schemas"]["FrameworkStatusStatusEnum"];
+            status_label: string;
             details: {
                 [key: string]: unknown;
             } | null;
         };
+        /**
+         * @description * `running` - running
+         *     * `idle` - idle
+         *     * `not_installed` - not_installed
+         * @enum {string}
+         */
+        FrameworkStatusStatusEnum: "running" | "idle" | "not_installed";
         HaltRequest: {
             reason: string;
         };

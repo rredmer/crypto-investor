@@ -79,12 +79,37 @@ def get_exchange(exchange_id: str = "kraken", sandbox: bool = True) -> ccxt.Exch
 # OHLCV Data Fetching
 # ──────────────────────────────────────────────
 
+def get_last_timestamp(
+    symbol: str,
+    timeframe: str,
+    exchange_id: str = "kraken",
+    directory: Optional[Path] = None,
+) -> Optional[datetime]:
+    """Read existing parquet and return last timestamp, or None if no data."""
+    directory = directory or PROCESSED_DIR
+    path = _parquet_path(symbol, timeframe, exchange_id, directory)
+    if not path.exists():
+        return None
+    try:
+        df = pd.read_parquet(path)
+        if df.empty:
+            return None
+        last_ts = df.index.max()
+        if last_ts.tzinfo is None:
+            last_ts = last_ts.tz_localize("UTC")
+        return last_ts.to_pydatetime()
+    except Exception:
+        logger.warning(f"Could not read last timestamp from {path}")
+        return None
+
+
 def fetch_ohlcv(
     symbol: str,
     timeframe: str = "1h",
     since_days: int = 365,
     exchange_id: str = "kraken",
     limit_per_request: int = 1000,
+    since_timestamp: Optional[datetime] = None,
 ) -> pd.DataFrame:
     """
     Fetch OHLCV candlestick data from an exchange.
@@ -101,6 +126,8 @@ def fetch_ohlcv(
         CCXT exchange identifier
     limit_per_request : int
         Max candles per API call
+    since_timestamp : datetime, optional
+        If provided, fetch data from this timestamp instead of since_days
 
     Returns
     -------
@@ -115,7 +142,11 @@ def fetch_ohlcv(
         return pd.DataFrame()
 
     # Calculate the starting timestamp
-    since = int((datetime.now(timezone.utc) - timedelta(days=since_days)).timestamp() * 1000)
+    if since_timestamp is not None:
+        since = int(since_timestamp.timestamp() * 1000)
+        logger.info(f"Incremental update for {symbol} {timeframe} from {since_timestamp}")
+    else:
+        since = int((datetime.now(timezone.utc) - timedelta(days=since_days)).timestamp() * 1000)
 
     # Map timeframes to milliseconds for pagination
     tf_ms = {
@@ -286,17 +317,26 @@ def fetch_ohlcv_multi(
     since_days: int = 365,
     asset_class: str = "crypto",
     exchange_id: str = "kraken",
+    since_timestamp: Optional[datetime] = None,
 ) -> pd.DataFrame:
     """Fetch OHLCV data routing to the correct data source by asset class.
 
     crypto  -> CCXT (existing)
     equity  -> yfinance
     forex   -> yfinance
+
+    If since_timestamp is provided, fetches only data newer than that timestamp.
     """
     if asset_class in ("equity", "forex"):
         from common.data_pipeline.yfinance_adapter import _fetch_ohlcv_sync
-        return _fetch_ohlcv_sync(symbol, timeframe, since_days, asset_class)
-    return fetch_ohlcv(symbol, timeframe, since_days, exchange_id)
+        return _fetch_ohlcv_sync(
+            symbol, timeframe, since_days, asset_class,
+            since_timestamp=since_timestamp,
+        )
+    return fetch_ohlcv(
+        symbol, timeframe, since_days, exchange_id,
+        since_timestamp=since_timestamp,
+    )
 
 
 # Default watchlists per asset class
@@ -344,10 +384,19 @@ def download_watchlist(
     for symbol in symbols:
         for tf in timeframes:
             done += 1
-            logger.info(f"[{done}/{total}] Downloading {symbol} {tf} ({asset_class})...")
+            # Check for existing data to enable incremental fetch
+            last_ts = get_last_timestamp(symbol, tf, source)
+            if last_ts:
+                logger.info(
+                    f"[{done}/{total}] Incremental update {symbol} {tf} "
+                    f"({asset_class}) from {last_ts}"
+                )
+            else:
+                logger.info(f"[{done}/{total}] Downloading {symbol} {tf} ({asset_class})...")
             try:
                 df = fetch_ohlcv_multi(
                     symbol, tf, since_days, asset_class, exchange_id,
+                    since_timestamp=last_ts,
                 )
                 if not df.empty:
                     path = save_ohlcv(df, symbol, tf, source)

@@ -686,7 +686,8 @@ export interface FrameworkStatus {
   name: string;
   installed: boolean;
   version: string | null;
-  status: "running" | "idle" | "configured" | "not_installed";
+  status: "running" | "idle" | "not_installed";
+  status_label: string;
   details: Record<string, unknown> | null;
 }
 

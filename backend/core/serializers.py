@@ -118,7 +118,8 @@ class FrameworkStatusSerializer(serializers.Serializer):
     name = serializers.CharField()
     installed = serializers.BooleanField()
     version = serializers.CharField(allow_null=True)
-    status = serializers.CharField()
+    status = serializers.ChoiceField(choices=["running", "idle", "not_installed"])
+    status_label = serializers.CharField()
     details = serializers.DictField(allow_null=True)
 
 

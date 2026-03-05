@@ -14,6 +14,46 @@ from django.conf import settings
 
 logger = logging.getLogger("job_runner")
 
+
+def recover_stale_jobs() -> int:
+    """Mark all running/pending BackgroundJobs as failed on startup.
+
+    Returns the number of recovered jobs.
+    """
+    from analysis.models import BackgroundJob
+
+    now = datetime.now(timezone.utc)
+    count = BackgroundJob.objects.filter(
+        status__in=["running", "pending"],
+    ).update(
+        status="failed",
+        error="Interrupted by server restart",
+        completed_at=now,
+    )
+    if count:
+        logger.info("Recovered %d stale BackgroundJob(s) on startup", count)
+    return count
+
+
+def recover_stale_workflow_runs() -> int:
+    """Mark all running/pending WorkflowRuns as failed on startup.
+
+    Returns the number of recovered runs.
+    """
+    from analysis.models import WorkflowRun
+
+    now = datetime.now(timezone.utc)
+    count = WorkflowRun.objects.filter(
+        status__in=["running", "pending"],
+    ).update(
+        status="failed",
+        error="Interrupted by server restart",
+        completed_at=now,
+    )
+    if count:
+        logger.info("Recovered %d stale WorkflowRun(s) on startup", count)
+    return count
+
 # In-memory progress store for live polling
 _job_progress: dict[str, dict[str, Any]] = {}
 
@@ -84,11 +124,22 @@ class JobRunner:
             except Exception:
                 pass
 
+            _last_persisted_pct = [0]  # mutable container for closure
+
             def progress_callback(progress: float, message: str = "") -> None:
+                clamped = min(progress, 1.0)
                 _job_progress[job_id] = {
-                    "progress": min(progress, 1.0),
+                    "progress": clamped,
                     "progress_message": message,
                 }
+                # Persist to DB every 10% increment
+                pct_10 = int(clamped * 10)
+                if pct_10 > _last_persisted_pct[0]:
+                    _last_persisted_pct[0] = pct_10
+                    BackgroundJob.objects.filter(id=job_id).update(
+                        progress=clamped,
+                        progress_message=message[:200],
+                    )
 
             result = run_fn(params, progress_callback)
 

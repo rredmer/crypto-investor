@@ -3434,6 +3434,8 @@ components:
           type: string
           nullable: true
         status:
+          $ref: '#/components/schemas/FrameworkStatusStatusEnum'
+        status_label:
           type: string
         details:
           type: object
@@ -3444,7 +3446,18 @@ components:
       - installed
       - name
       - status
+      - status_label
       - version
+    FrameworkStatusStatusEnum:
+      enum:
+      - running
+      - idle
+      - not_installed
+      type: string
+      description: |-
+        * `running` - running
+        * `idle` - idle
+        * `not_installed` - not_installed
     HaltRequest:
       type: object
       properties:

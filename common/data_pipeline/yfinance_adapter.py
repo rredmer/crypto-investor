@@ -118,8 +118,12 @@ def _fetch_ohlcv_sync(
     timeframe: str = "1d",
     since_days: int = 365,
     asset_class: str = "equity",
+    since_timestamp: "datetime | None" = None,
 ) -> pd.DataFrame:
-    """Synchronous yfinance OHLCV fetch. Use fetch_ohlcv_yfinance for async."""
+    """Synchronous yfinance OHLCV fetch. Use fetch_ohlcv_yfinance for async.
+
+    If since_timestamp is provided, fetches data from that point instead of since_days.
+    """
     import yfinance as yf
 
     yf_symbol = normalize_symbol(symbol, asset_class)
@@ -133,13 +137,19 @@ def _fetch_ohlcv_sync(
         )
         since_days = max_days
 
-    start = datetime.now(timezone.utc) - timedelta(days=since_days)
+    if since_timestamp is not None:
+        start = since_timestamp
+        logger.info(
+            f"Incremental update {yf_symbol} ({asset_class}) {yf_interval} "
+            f"from {since_timestamp}"
+        )
+    else:
+        start = datetime.now(timezone.utc) - timedelta(days=since_days)
+        logger.info(
+            f"Fetching {yf_symbol} ({asset_class}) {yf_interval} "
+            f"from yfinance ({since_days} days)..."
+        )
     end = datetime.now(timezone.utc)
-
-    logger.info(
-        f"Fetching {yf_symbol} ({asset_class}) {yf_interval} "
-        f"from yfinance ({since_days} days)..."
-    )
 
     ticker = yf.Ticker(yf_symbol)
     df = ticker.history(
@@ -199,10 +209,12 @@ async def fetch_ohlcv_yfinance(
     timeframe: str = "1d",
     since_days: int = 365,
     asset_class: str = "equity",
+    since_timestamp: "datetime | None" = None,
 ) -> pd.DataFrame:
     """Async wrapper around yfinance OHLCV fetch."""
     return await asyncio.to_thread(
         _fetch_ohlcv_sync, symbol, timeframe, since_days, asset_class,
+        since_timestamp=since_timestamp,
     )
 
 
