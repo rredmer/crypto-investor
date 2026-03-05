@@ -48,8 +48,8 @@ data:
   processed_path: "data/processed"
   orderbook_path: "data/orderbook"
 
-  # Verified Kraken USDT pairs (2026-03-05) — 24h volume > $10k USD
-  # Excluded: stablecoins, pegged assets, sub-$10k volume pairs
+  # All non-stablecoin Kraken USDT pairs (2026-03-05)
+  # 36 pairs: excludes stablecoins (DAI, USDC, USDE, USDG, USDQ, USDR, USAT, RLUSD, EURR, XAUT)
   watchlist:
     - "BTC/USDT"
     - "ETH/USDT"
@@ -75,6 +75,19 @@ data:
     - "XTZ/USDT"
     - "CC/USDT"
     - "ALEO/USDT"
+    # Lower volume but active
+    - "APE/USDT"
+    - "BERA/USDT"
+    - "CRO/USDT"
+    - "MANA/USDT"
+    - "MELANIA/USDT"
+    - "OBOL/USDT"
+    - "S/USDT"
+    - "SHIB/USDT"
+    - "SIDEKICK/USDT"
+    - "TON/USDT"
+    - "VET/USDT"
+    - "VIRTUAL/USDT"
 
   timeframes:
     - "1m"
@@ -98,6 +111,7 @@ data:
     - "TLT/USD"
 
   forex_watchlist:
+    # 7 majors
     - "EUR/USD"
     - "GBP/USD"
     - "USD/JPY"
@@ -105,14 +119,49 @@ data:
     - "AUD/USD"
     - "NZD/USD"
     - "USD/CAD"
-    - "EUR/GBP"
+    # Yen crosses
     - "EUR/JPY"
     - "GBP/JPY"
     - "AUD/JPY"
-    - "EUR/CHF"
-    - "EUR/AUD"
-    - "GBP/CHF"
     - "NZD/JPY"
+    - "CAD/JPY"
+    - "CHF/JPY"
+    # EUR crosses
+    - "EUR/GBP"
+    - "EUR/AUD"
+    - "EUR/NZD"
+    - "EUR/CHF"
+    - "EUR/CAD"
+    # GBP crosses
+    - "GBP/AUD"
+    - "GBP/NZD"
+    - "GBP/CHF"
+    - "GBP/CAD"
+    # Commodity currency crosses
+    - "AUD/NZD"
+    - "AUD/CAD"
+    - "AUD/CHF"
+    - "NZD/CAD"
+    - "NZD/CHF"
+    - "CAD/CHF"
+    # Scandinavian
+    - "USD/SEK"
+    - "USD/NOK"
+    - "USD/DKK"
+    - "EUR/SEK"
+    - "EUR/NOK"
+    - "EUR/DKK"
+    # Emerging / exotic
+    - "USD/SGD"
+    - "USD/HKD"
+    - "USD/MXN"
+    - "USD/ZAR"
+    - "USD/TRY"
+    - "USD/PLN"
+    - "USD/INR"
+    - "USD/CNY"
+    - "USD/THB"
+    - "USD/KRW"
 
   # How many days of historical data to fetch
   history_days: 365
