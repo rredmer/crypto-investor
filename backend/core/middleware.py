@@ -106,13 +106,15 @@ class RateLimitMiddleware:
         ip = self._get_ip(request)
         path = request.path
 
-        # Determine rate limit
+        # Determine rate limit — login and general use separate buckets
         if path.startswith("/api/auth/login"):
             limit = getattr(settings, "RATE_LIMIT_LOGIN", 5)
+            bucket_key = f"login:{ip}"
         else:
             limit = getattr(settings, "RATE_LIMIT_GENERAL", 60)
+            bucket_key = f"general:{ip}"
 
-        allowed, remaining, reset_time = self._allow(ip, limit)
+        allowed, remaining, reset_time = self._allow(bucket_key, limit)
 
         if not allowed:
             logger.warning(f"Rate limit exceeded: ip={ip} path={path}")
