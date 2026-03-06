@@ -297,10 +297,11 @@ def _run_vbt_screen(params: dict, progress_cb: ProgressCallback) -> dict[str, An
         try:
             from analysis.services.screening import ScreenerService
 
+            default_exchange = "yfinance" if asset_class in ("equity", "forex") else "kraken"
             screen_params = {
                 "symbol": symbol,
-                "timeframe": timeframe,
-                "exchange": params.get("exchange", "kraken"),
+                "timeframe": "1d" if asset_class in ("equity", "forex") else timeframe,
+                "exchange": params.get("exchange", default_exchange),
                 "asset_class": asset_class,
             }
             result = ScreenerService.run_full_screen(

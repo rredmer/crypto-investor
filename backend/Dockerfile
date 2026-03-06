@@ -28,7 +28,7 @@ COPY hftbacktest/ ./hftbacktest/
 # Copy backend and install deps (analysis extras add pandas/numpy/scipy/pyarrow)
 COPY backend/ ./backend/
 WORKDIR /project/backend
-RUN pip install --no-cache-dir -e ".[analysis]" ta-lib
+RUN pip install --no-cache-dir -e ".[analysis,ml]" ta-lib
 
 RUN mkdir -p /project/backend/data/logs /project/data/processed
 
