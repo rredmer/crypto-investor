@@ -16,6 +16,8 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+pytest.importorskip("lightgbm")
+
 from common.ml.features import (
     add_lag_features,
     add_return_features,

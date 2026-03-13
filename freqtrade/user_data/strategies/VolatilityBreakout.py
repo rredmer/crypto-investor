@@ -112,7 +112,8 @@ class VolatilityBreakout(IStrategy):
         dataframe["bb_upper"] = bollinger["upperband"]
         dataframe["bb_mid"] = bollinger["middleband"]
         dataframe["bb_lower"] = bollinger["lowerband"]
-        dataframe["bb_width"] = (dataframe["bb_upper"] - dataframe["bb_lower"]) / dataframe["bb_mid"]
+        bb_range = dataframe["bb_upper"] - dataframe["bb_lower"]
+        dataframe["bb_width"] = bb_range / dataframe["bb_mid"]
         dataframe["bb_width_prev"] = dataframe["bb_width"].shift(1)
 
         # EMAs
@@ -147,7 +148,10 @@ class VolatilityBreakout(IStrategy):
         )
 
         # RSI in acceptable range (wide: 25-75 default)
-        rsi_ok = (dataframe["rsi"] >= self.rsi_low.value) & (dataframe["rsi"] <= self.rsi_high.value)
+        rsi_ok = (
+            (dataframe["rsi"] >= self.rsi_low.value)
+            & (dataframe["rsi"] <= self.rsi_high.value)
+        )
 
         # Volume present
         has_volume = dataframe["volume"] > 0
@@ -200,7 +204,10 @@ class VolatilityBreakout(IStrategy):
         effective_min = min_stake if min_stake is not None else 0.0
         result = max(min(adjusted, max_stake), effective_min)
         if modifier != 1.0:
-            logger.info(f"Stake adjusted {pair}: {proposed_stake:.2f} × {modifier:.2f} = {result:.2f}")
+            logger.info(
+                "Stake adjusted %s: %.2f × %.2f = %.2f",
+                pair, proposed_stake, modifier, result,
+            )
         return result
 
     def confirm_trade_entry(

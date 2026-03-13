@@ -122,7 +122,8 @@ class CryptoInvestorV1(IStrategy):
         dataframe["bb_upper"] = bollinger["upperband"]
         dataframe["bb_mid"] = bollinger["middleband"]
         dataframe["bb_lower"] = bollinger["lowerband"]
-        dataframe["bb_width"] = (dataframe["bb_upper"] - dataframe["bb_lower"]) / dataframe["bb_mid"]
+        bb_range = dataframe["bb_upper"] - dataframe["bb_lower"]
+        dataframe["bb_width"] = bb_range / dataframe["bb_mid"]
 
         # ── ATR ──
         dataframe["atr"] = ta.ATR(dataframe, timeperiod=14)
@@ -165,9 +166,11 @@ class CryptoInvestorV1(IStrategy):
 
         # Required: minimal trend filter — EMA-21 above EMA-50 OR EMA-50 rising
         # Prevents counter-trend entries in WEAK_TREND_DOWN
+        ema_fast = f"ema_{self.buy_ema_fast.value}"
+        ema_slow = f"ema_{self.buy_ema_slow.value}"
         ema_directional = (
-            (dataframe[f"ema_{self.buy_ema_fast.value}"] > dataframe[f"ema_{self.buy_ema_slow.value}"])
-            | (dataframe[f"ema_{self.buy_ema_slow.value}"] > dataframe[f"ema_{self.buy_ema_slow.value}"].shift(5))
+            (dataframe[ema_fast] > dataframe[ema_slow])
+            | (dataframe[ema_slow] > dataframe[ema_slow].shift(5))
         )
 
         # Confirmation signals — need at least ONE
@@ -239,7 +242,10 @@ class CryptoInvestorV1(IStrategy):
         effective_min = min_stake if min_stake is not None else 0.0
         result = max(min(adjusted, max_stake), effective_min)
         if modifier != 1.0:
-            logger.info(f"Stake adjusted {pair}: {proposed_stake:.2f} × {modifier:.2f} = {result:.2f}")
+            logger.info(
+                "Stake adjusted %s: %.2f × %.2f = %.2f",
+                pair, proposed_stake, modifier, result,
+            )
         return result
 
     def custom_stoploss(
@@ -316,9 +322,8 @@ class CryptoInvestorV1(IStrategy):
             return "trend_breakdown"
 
         # Exit if held too long with small profit (opportunity cost)
-        if trade.open_date_utc + timedelta(days=7) < current_time:
-            if current_profit < 0.01:
-                return "stale_trade"
+        if trade.open_date_utc + timedelta(days=7) < current_time and current_profit < 0.01:
+            return "stale_trade"
 
         return None
 

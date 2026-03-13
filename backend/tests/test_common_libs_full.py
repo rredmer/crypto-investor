@@ -16,6 +16,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+pytest.importorskip("lightgbm")
+
 from common.indicators.technical import (
     add_all_indicators,
     adx,

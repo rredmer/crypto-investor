@@ -149,20 +149,49 @@ def cmd_validate():
     print("Running framework validation...\n")
 
     tests = [
-        ("freqtrade", "from freqtrade.strategy import IStrategy; print('Freqtrade IStrategy: OK')"),
-        ("nautilus_trader", "from nautilus_trader.backtest.engine import BacktestEngine; print('NautilusTrader BacktestEngine: OK')"),
-        ("nautilus_strategies", "from nautilus.strategies import STRATEGY_REGISTRY; assert len(STRATEGY_REGISTRY) >= 3; print(f'Nautilus strategies: {len(STRATEGY_REGISTRY)} registered')"),
-        ("vectorbt", "import vectorbt as vbt; print(f'VectorBT Portfolio: OK')"),
-        ("hftbacktest_module", "from hftbacktest.strategies import STRATEGY_REGISTRY; assert len(STRATEGY_REGISTRY) >= 1; print(f'HFT strategies: {len(STRATEGY_REGISTRY)} registered')"),
-        ("ccxt", "import ccxt; e = ccxt.binance(); print(f'CCXT Binance: OK, {len(e.describe()[\"api\"])} API groups')"),
-        ("pandas+numpy", "import pandas as pd; import numpy as np; print(f'Pandas {pd.__version__}, NumPy {np.__version__}: OK')"),
-        ("talib", "import talib; print(f'TA-Lib functions: {len(talib.get_functions())} available')"),
-        ("ml_features", "from common.ml.features import build_feature_matrix; print('ML features: OK')"),
-        ("ml_trainer", "from common.ml.trainer import HAS_LIGHTGBM; print(f'ML trainer: OK (lightgbm={HAS_LIGHTGBM})')"),
-        ("ml_registry", "from common.ml.registry import ModelRegistry; print('ML registry: OK')"),
-        ("indicators", "from common.indicators.technical import add_all_indicators; print('Shared indicators: OK')"),
-        ("data_pipeline", "from common.data_pipeline.pipeline import fetch_ohlcv, load_ohlcv; print('Data pipeline: OK')"),
-        ("risk_manager", "from common.risk.risk_manager import RiskManager; rm = RiskManager(); print(f'Risk manager: OK, limits={rm.limits}')"),
+        ("freqtrade",
+         "from freqtrade.strategy import IStrategy; print('Freqtrade: OK')"),
+        ("nautilus_trader",
+         "from nautilus_trader.backtest.engine import BacktestEngine;"
+         " print('NautilusTrader: OK')"),
+        ("nautilus_strategies",
+         "from nautilus.strategies import STRATEGY_REGISTRY;"
+         " assert len(STRATEGY_REGISTRY) >= 3;"
+         " print(f'Nautilus strategies: {len(STRATEGY_REGISTRY)}')"),
+        ("vectorbt",
+         "import vectorbt as vbt; print('VectorBT: OK')"),
+        ("hftbacktest_module",
+         "from hftbacktest.strategies import STRATEGY_REGISTRY;"
+         " assert len(STRATEGY_REGISTRY) >= 1;"
+         " print(f'HFT strategies: {len(STRATEGY_REGISTRY)}')"),
+        ("ccxt",
+         "import ccxt; e = ccxt.binance();"
+         " print(f'CCXT: OK, {len(e.describe()[\"api\"])} groups')"),
+        ("pandas+numpy",
+         "import pandas as pd; import numpy as np;"
+         " print(f'Pandas {pd.__version__}, NumPy {np.__version__}')"),
+        ("talib",
+         "import talib;"
+         " print(f'TA-Lib: {len(talib.get_functions())} functions')"),
+        ("ml_features",
+         "from common.ml.features import build_feature_matrix;"
+         " print('ML features: OK')"),
+        ("ml_trainer",
+         "from common.ml.trainer import HAS_LIGHTGBM;"
+         " print(f'ML trainer: OK (lgb={HAS_LIGHTGBM})')"),
+        ("ml_registry",
+         "from common.ml.registry import ModelRegistry;"
+         " print('ML registry: OK')"),
+        ("indicators",
+         "from common.indicators.technical import add_all_indicators;"
+         " print('Shared indicators: OK')"),
+        ("data_pipeline",
+         "from common.data_pipeline.pipeline import fetch_ohlcv, load_ohlcv;"
+         " print('Data pipeline: OK')"),
+        ("risk_manager",
+         "from common.risk.risk_manager import RiskManager;"
+         " rm = RiskManager();"
+         " print(f'Risk manager: OK, limits={rm.limits}')"),
     ]
 
     passed = 0
@@ -302,7 +331,10 @@ def cmd_research(args):
                     top = df.head(1)
                     sr = top["sharpe_ratio"].iloc[0] if "sharpe_ratio" in top.columns else "N/A"
                     ret = top["total_return"].iloc[0] if "total_return" in top.columns else "N/A"
-                    print(f"  {name}: Best Sharpe={sr:.3f}, Return={ret:.2%}" if isinstance(sr, float) else f"  {name}: {sr}")
+                    if isinstance(sr, float):
+                        print(f"  {name}: Sharpe={sr:.3f}, Ret={ret:.2%}")
+                    else:
+                        print(f"  {name}: {sr}")
     else:
         print("Usage: python run.py research screen [--symbol BTC/USDT] [--timeframe 1h]")
 
@@ -376,7 +408,7 @@ def cmd_nautilus(args):
         if success:
             print("✅ NautilusTrader engine initialized successfully")
         else:
-            print("❌ NautilusTrader engine not available (install with: pip install nautilus_trader)")
+            print("❌ NautilusTrader not available (pip install nautilus_trader)")
 
     elif args.nt_command == "convert":
         from nautilus.nautilus_runner import convert_ohlcv_to_nautilus_csv

@@ -61,7 +61,10 @@ with left:
         r1.metric("Equity", f"${risk.get('equity', 0):,.2f}")
         r2.metric("Drawdown", f"{risk.get('drawdown', 0):.2%}")
         halted = risk.get("is_halted", False)
-        st.warning(f"HALTED — {risk.get('halt_reason', '')}") if halted else st.success("Trading active")
+        if halted:
+            st.warning(f"HALTED — {risk.get('halt_reason', '')}")
+        else:
+            st.success("Trading active")
 
     heat = api_get("/risk/1/heat-check/")
     if heat:

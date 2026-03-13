@@ -79,7 +79,9 @@ class BollingerMeanReversion(IStrategy):
     buy_bb_period = IntParameter(15, 30, default=20, space="buy", optimize=True)
     buy_bb_std = DecimalParameter(0.8, 3.0, default=1.5, decimals=1, space="buy", optimize=True)
     buy_rsi_threshold = IntParameter(25, 50, default=40, space="buy", optimize=True)
-    buy_volume_factor = DecimalParameter(0.0, 2.5, default=0.5, decimals=1, space="buy", optimize=True)
+    buy_volume_factor = DecimalParameter(
+        0.0, 2.5, default=0.5, decimals=1, space="buy", optimize=True,
+    )
     buy_adx_ceiling = IntParameter(25, 60, default=40, space="buy", optimize=True)
     sell_rsi_threshold = IntParameter(55, 75, default=60, space="sell", optimize=True)
 
@@ -122,7 +124,8 @@ class BollingerMeanReversion(IStrategy):
 
         Volume factor defaults to 0.0 (disabled) for maximum trade frequency.
         """
-        bb_suffix = f"_{self.buy_bb_period.value}_{str(float(self.buy_bb_std.value)).replace('.', '')}"
+        std_str = str(float(self.buy_bb_std.value)).replace(".", "")
+        bb_suffix = f"_{self.buy_bb_period.value}_{std_str}"
 
         conditions = [
             # Price below or near lower Bollinger Band
@@ -151,7 +154,8 @@ class BollingerMeanReversion(IStrategy):
 
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
 
-        bb_suffix = f"_{self.buy_bb_period.value}_{str(float(self.buy_bb_std.value)).replace('.', '')}"
+        std_str = str(float(self.buy_bb_std.value)).replace(".", "")
+        bb_suffix = f"_{self.buy_bb_period.value}_{std_str}"
 
         conditions = [
             # Price reaches middle band (mean reversion target)
@@ -193,7 +197,10 @@ class BollingerMeanReversion(IStrategy):
         effective_min = min_stake if min_stake is not None else 0.0
         result = max(min(adjusted, max_stake), effective_min)
         if modifier != 1.0:
-            logger.info(f"Stake adjusted {pair}: {proposed_stake:.2f} × {modifier:.2f} = {result:.2f}")
+            logger.info(
+                "Stake adjusted %s: %.2f × %.2f = %.2f",
+                pair, proposed_stake, modifier, result,
+            )
         return result
 
     def confirm_trade_entry(
@@ -267,7 +274,10 @@ class BollingerMeanReversion(IStrategy):
         """Conviction-based exit: regime deterioration, time limits."""
         return check_exit_advice(self, pair, trade, current_time, current_profit)
 
-    def custom_stoploss(self, pair, trade, current_time, current_rate, current_profit, after_fill, **kwargs):
+    def custom_stoploss(
+        self, pair, trade, current_time, current_rate,
+        current_profit, after_fill, **kwargs,
+    ):
         """ATR-based dynamic stop loss with regime-aware tightening."""
         dataframe, _ = self.dp.get_analyzed_dataframe(pair, self.timeframe)
         if dataframe.empty:

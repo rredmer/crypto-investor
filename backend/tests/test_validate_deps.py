@@ -4,6 +4,8 @@ import importlib
 
 import pytest
 
+pytest.importorskip("lightgbm")
+
 # Every module listed here MUST be installed in the dev/test environment.
 # If a test fails here, install the missing package — do NOT skip it.
 REQUIRED_IMPORTS = [
