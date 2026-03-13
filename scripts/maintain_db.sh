@@ -8,7 +8,7 @@ echo "=== SQLite Maintenance ==="
 docker compose exec -T backend python manage.py shell -c "
 from django.db import connection
 with connection.cursor() as c:
-    c.execute('PRAGMA wal_checkpoint(TRUNCATE)')
+    c.execute('PRAGMA wal_checkpoint(PASSIVE)')
     print('WAL checkpoint:', c.fetchone())
     c.execute('PRAGMA integrity_check')
     result = c.fetchone()

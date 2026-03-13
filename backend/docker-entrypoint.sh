@@ -27,26 +27,21 @@ python manage.py collectstatic --noinput --clear 2>/dev/null
 echo "→ Running pre-flight checks..."
 python manage.py pilot_preflight || echo "WARNING: Pre-flight returned NO-GO (check logs)"
 
-echo "→ Closing all DB connections and checkpointing WAL..."
+echo "→ Closing startup DB connections..."
 python -c "
-import sqlite3, os, gc
-# Force close any lingering Django connections from startup commands
+# Close Django connections from startup commands (migrate, collectstatic, etc.)
+# so Daphne starts with a clean connection slate.
+# NOTE: Do NOT run PRAGMA wal_checkpoint(TRUNCATE) here or anywhere.
+# TRUNCATE changes the WAL file inode under Docker virtiofs bind mounts,
+# which causes 'disk I/O error' on all connections that opened the old inode.
 try:
     from django.db import connections
     for conn in connections.all():
         conn.close()
+    print('  Startup connections closed')
 except Exception:
     pass
-gc.collect()
-
-# Checkpoint and truncate WAL so Daphne starts with a clean slate
-db = os.path.join('/project/backend/data', 'a1si_aitp.db')
-if os.path.exists(db):
-    conn = sqlite3.connect(db)
-    conn.execute('PRAGMA wal_checkpoint(TRUNCATE)')
-    conn.close()
-    print('  WAL checkpoint OK')
-" || echo "  WARNING: WAL checkpoint failed (non-fatal)"
+" || true
 
 echo "→ Starting Daphne..."
 exec "$@"

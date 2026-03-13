@@ -343,12 +343,17 @@ def _run_risk_monitoring(params: dict, progress_cb: ProgressCallback) -> dict[st
 
 
 def _run_db_maintenance(params: dict, progress_cb: ProgressCallback) -> dict[str, Any]:
-    """Run SQLite WAL checkpoint to prevent unbounded WAL growth."""
+    """Run SQLite WAL checkpoint to prevent unbounded WAL growth.
+
+    Uses PASSIVE mode (not TRUNCATE) to avoid changing the WAL file inode.
+    TRUNCATE under Docker virtiofs bind mounts causes stale file descriptors
+    in the Daphne process, leading to "disk I/O error" on all subsequent queries.
+    """
     from django.db import connection
 
     progress_cb(0.1, "Running WAL checkpoint")
     with connection.cursor() as cursor:
-        cursor.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        cursor.execute("PRAGMA wal_checkpoint(PASSIVE)")
         row = cursor.fetchone()
         wal_result = {"busy": row[0], "log": row[1], "checkpointed": row[2]}
     progress_cb(0.9, "Checkpoint complete")
