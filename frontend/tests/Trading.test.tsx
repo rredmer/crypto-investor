@@ -517,7 +517,6 @@ describe("Trading - Cancel All Mutation", () => {
     fireEvent.click(screen.getByText("Cancel All Orders"));
     // Click confirm in dialog
     const dialog = screen.getByRole("dialog");
-    const confirmBtn = dialog.querySelector("button");
     // Find the Cancel All button in the dialog (not the Cancel button)
     const allBtns = Array.from(dialog.querySelectorAll("button"));
     const cancelAllBtn = allBtns.find((btn) => btn.textContent === "Cancel All");

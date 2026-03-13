@@ -1168,6 +1168,7 @@ describe("RiskManagement - Drawdown color logic", () => {
 
 describe("RiskManagement - statusError banner", () => {
   it("shows error banner when status query fails", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const fetchFn = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
       if (url.includes("/status")) {

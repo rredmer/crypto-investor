@@ -264,6 +264,7 @@ describe("ConvictionDashboard", () => {
   });
 
   it("renders heatmap error when batch fails", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
       if (url.includes("/api/signals/batch")) {

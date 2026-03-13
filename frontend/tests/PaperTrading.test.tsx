@@ -525,6 +525,7 @@ describe("PaperTrading - Start Mutation Error", () => {
         headers: { "Content-Type": "application/json" },
       });
     }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const failingFetch = (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
       if (url.includes("/paper-trading/start")) {
